@@ -28,17 +28,35 @@ class DatabaseManager:
             cursor.execute("SELECT nom FROM produits")
             return [row[0] for row in cursor.fetchall()]
     
-    def get_sablieres(self):
+    def get_sable(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT fournisseur FROM sable")
-            return [row[0] for row in cursor.fetchall()]
+            cursor.execute("SELECT id, transporteur, camion, ville, prix_voyage, prix_sable FROM sable")
+            return cursor.fetchall()
     
-    def get_transporteurs(self):
+    def add_sable(self, transporteur, camion, ville, prix_voyage, prix_sable):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT transporteur FROM transport")
-            return [row[0] for row in cursor.fetchall()]
+            cursor.execute("""
+                INSERT INTO sable (transporteur, camion, ville, prix_voyage, prix_sable)
+                VALUES (?, ?, ?, ?, ?)
+            """, (transporteur, camion, ville, prix_voyage, prix_sable))
+            conn.commit()
+    
+    def update_sable(self, sable_id, transporteur, camion, ville, prix_voyage, prix_sable):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE sable SET transporteur = ?, camion = ?, ville = ?, prix_voyage = ?, prix_sable = ?
+                WHERE id = ?
+            """, (transporteur, camion, ville, prix_voyage, prix_sable, sable_id))
+            conn.commit()
+    
+    def delete_sable(self, sable_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM sable WHERE id = ?", (sable_id,))
+            conn.commit()
     
     def get_clients(self):
         with self.get_connection() as conn:

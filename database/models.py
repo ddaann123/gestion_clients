@@ -5,6 +5,7 @@ def init_database(db_path):
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
         
+
         # Table clients
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS clients (
@@ -64,25 +65,15 @@ def init_database(db_path):
             )
         """)
         
-        # Table sable
+        # Nouvelle table sable
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sable (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fournisseur TEXT,
-                prix_tonne REAL,
-                devise TEXT
-            )
-        """)
-        
-        # Table transport
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS transport (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                transporteur TEXT,
-                ville TEXT,
-                camion TEXT,
-                prix_voyage REAL,
-                devise TEXT
+                transporteur TEXT NOT NULL,
+                camion INTEGER NOT NULL,
+                ville TEXT NOT NULL,
+                prix_voyage REAL NOT NULL,
+                prix_sable REAL NOT NULL
             )
         """)
         

@@ -1,6 +1,140 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+class ParamManager:
+    def __init__(self, parent, db_manager):
+        self.db_manager = db_manager
+        self.window = tk.Toplevel(parent)
+        self.window.title("Gestion des Paramètres - Sable")
+        self.window.geometry("800x600")
+
+        main_frame = ttk.Frame(self.window)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Formulaire
+        form_frame = ttk.LabelFrame(main_frame, text="Ajouter/Modifier Sable", padding=10)
+        form_frame.pack(fill="x", pady=5)
+
+        fields = [
+            ("Transporteur", tk.StringVar()),
+            ("Type de camion (tm)", tk.IntVar(value=10)),
+            ("Ville", tk.StringVar()),
+            ("Prix transport seul. par voyage ($)", tk.DoubleVar(value=200.0)),
+            ("Prix du sable par tm ($/tm)", tk.DoubleVar(value=50.0))
+        ]
+        self.sable_entries = {}
+        for i, (label, var) in enumerate(fields):
+            tk.Label(form_frame, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="w")
+            if isinstance(var, tk.IntVar):
+                entry = tk.Entry(form_frame, textvariable=tk.StringVar(value=str(var.get())), width=30)
+                entry.configure(validate='key', validatecommand=(form_frame.register(lambda p: p.isdigit() or not p), '%P'))
+            elif isinstance(var, tk.DoubleVar):
+                entry = tk.Entry(form_frame, textvariable=tk.StringVar(value=str(var.get())), width=30)
+                entry.configure(validate='key', validatecommand=(form_frame.register(lambda p: p.replace('.', '', 1).isdigit() or not p), '%P'))
+            else:
+                entry = tk.Entry(form_frame, textvariable=var, width=30)
+            entry.grid(row=i, column=1, padx=5, pady=5)
+            self.sable_entries[label] = var if not isinstance(var, (tk.IntVar, tk.DoubleVar)) else entry
+
+        tk.Button(form_frame, text="Enregistrer", command=self.save_sable).grid(row=len(fields), column=0, columnspan=2, pady=10)
+        tk.Button(form_frame, text="Effacer", command=lambda: self.clear_sable_form()).grid(row=len(fields)+1, column=0, columnspan=2, pady=5)
+
+        # Liste
+        list_frame = ttk.LabelFrame(main_frame, text="Liste des Sables", padding=10)
+        list_frame.pack(fill="both", expand=True, pady=5)
+        self.sable_tree = ttk.Treeview(list_frame, columns=("ID", "Transporteur", "Type de camion (tm)", "Ville", "Prix transport seul. par voyage ($)", "Prix du sable par tm ($/tm)"), show="headings")
+        self.sable_tree.heading("ID", text="ID")
+        self.sable_tree.heading("Transporteur", text="Transporteur")
+        self.sable_tree.heading("Type de camion (tm)", text="Type de camion (tm)")
+        self.sable_tree.heading("Ville", text="Ville")
+        self.sable_tree.heading("Prix transport seul. par voyage ($)", text="Prix transport seul. par voyage ($)")
+        self.sable_tree.heading("Prix du sable par tm ($/tm)", text="Prix du sable par tm ($/tm)")
+        self.sable_tree.column("ID", width=50)
+        self.sable_tree.column("Transporteur", width=150)
+        self.sable_tree.column("Type de camion (tm)", width=120)
+        self.sable_tree.column("Ville", width=120)
+        self.sable_tree.column("Prix transport seul. par voyage ($)", width=150)
+        self.sable_tree.column("Prix du sable par tm ($/tm)", width=150)
+        self.sable_tree.pack(fill="both", expand=True)
+        self.sable_tree.bind("<Double-1>", self.edit_sable)
+
+        tk.Button(list_frame, text="Supprimer", command=self.delete_sable).pack(pady=5)
+
+        self.load_sable()
+
+    def load_sable(self):
+        for item in self.sable_tree.get_children():
+            self.sable_tree.delete(item)
+        sable_list = self.db_manager.get_sable()
+        for sable in sable_list:
+            self.sable_tree.insert("", "end", values=sable)
+
+    def clear_sable_form(self):
+        for label, var in self.sable_entries.items():
+            if isinstance(var, tk.Entry):
+                var.delete(0, tk.END)
+            elif isinstance(var, tk.StringVar):
+                var.set("")
+            elif isinstance(var, tk.IntVar):
+                var.set(10)
+            elif isinstance(var, tk.DoubleVar):
+                var.set(200.0 if label == "Prix transport seul. par voyage ($)" else 50.0)
+
+    def save_sable(self):
+        try:
+            transporteur = self.sable_entries["Transporteur"].get() if isinstance(self.sable_entries["Transporteur"], tk.StringVar) else self.sable_entries["Transporteur"].get().strip()
+            camion = int(self.sable_entries["Type de camion (tm)"].get() if isinstance(self.sable_entries["Type de camion (tm)"], tk.Entry) else self.sable_entries["Type de camion (tm)"].get())
+            ville = self.sable_entries["Ville"].get() if isinstance(self.sable_entries["Ville"], tk.StringVar) else self.sable_entries["Ville"].get().strip()
+            prix_voyage = float(self.sable_entries["Prix transport seul. par voyage ($)"].get() if isinstance(self.sable_entries["Prix transport seul. par voyage ($)"], tk.Entry) else self.sable_entries["Prix transport seul. par voyage ($)"].get())
+            prix_sable = float(self.sable_entries["Prix du sable par tm ($/tm)"].get() if isinstance(self.sable_entries["Prix du sable par tm ($/tm)"], tk.Entry) else self.sable_entries["Prix du sable par tm ($/tm)"].get())
+            if not transporteur or not ville or prix_voyage <= 0 or prix_sable <= 0:
+                raise ValueError("Tous les champs sont requis et les prix doivent être positifs")
+
+            selected = self.sable_tree.selection()
+            if selected:
+                sable_id = self.sable_tree.item(selected[0])["values"][0]
+                self.db_manager.update_sable(sable_id, transporteur, camion, ville, prix_voyage, prix_sable)
+                messagebox.showinfo("Succès", "Sable modifié")
+            else:
+                self.db_manager.add_sable(transporteur, camion, ville, prix_voyage, prix_sable)
+                messagebox.showinfo("Succès", "Sable ajouté")
+            self.load_sable()
+            self.clear_sable_form()
+        except ValueError as e:
+            messagebox.showerror("Erreur", str(e))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur d'enregistrement : {e}")
+
+    def edit_sable(self, event=None):
+        selected = self.sable_tree.selection()
+        if not selected:
+            return
+        sable_data = self.sable_tree.item(selected[0])["values"]
+        self.sable_entries["Transporteur"].set(sable_data[1]) if isinstance(self.sable_entries["Transporteur"], tk.StringVar) else self.sable_entries["Transporteur"].delete(0, tk.END).insert(0, sable_data[1])
+        self.sable_entries["Type de camion (tm)"].set(str(sable_data[2])) if isinstance(self.sable_entries["Type de camion (tm)"], tk.Entry) else self.sable_entries["Type de camion (tm)"].set(sable_data[2])
+        self.sable_entries["Ville"].set(sable_data[3]) if isinstance(self.sable_entries["Ville"], tk.StringVar) else self.sable_entries["Ville"].delete(0, tk.END).insert(0, sable_data[3])
+        self.sable_entries["Prix transport seul. par voyage ($)"].set(str(sable_data[4])) if isinstance(self.sable_entries["Prix transport seul. par voyage ($)"], tk.Entry) else self.sable_entries["Prix transport seul. par voyage ($)"].set(sable_data[4])
+        self.sable_entries["Prix du sable par tm ($/tm)"].set(str(sable_data[5])) if isinstance(self.sable_entries["Prix du sable par tm ($/tm)"], tk.Entry) else self.sable_entries["Prix du sable par tm ($/tm)"].set(sable_data[5])
+
+    def delete_sable(self):
+        selected = self.sable_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        sable_id = self.sable_tree.item(selected[0])["values"][0]
+        if messagebox.askyesno("Confirmation", "Voulez-vous supprimer cette entrée ?"):
+            try:
+                self.db_manager.delete_sable(sable_id)
+                self.load_sable()
+                self.clear_sable_form()
+                messagebox.showinfo("Succès", "Entrée supprimée")
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
+
+
+
+
+
 class MainDoeuvreForm:
     def __init__(self, parent, db_manager, main_doeuvre_data=None):
         self.db_manager = db_manager
