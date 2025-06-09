@@ -1,3 +1,4 @@
+# Test pour valider le transfert sur GitHub
 # main.py
 import tkinter as tk
 from database.db_manager import DatabaseManager
