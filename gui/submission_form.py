@@ -23,8 +23,17 @@ class SubmissionForm:
         tk.Label(frame, text="Produit").grid(row=1, column=0, padx=5, pady=5, sticky="w")
         self.produit_var = tk.StringVar()
         produits = self.db_manager.get_produits()
+        produits = self.db_manager.get_produits()
+        if produits:
+            self.produit_var.set(produits[0])  # Définit le premier produit comme valeur par défaut
+            tk.OptionMenu(frame, self.produit_var, *produits).grid(row=1, column=1, padx=5, pady=5)
+        else:
+            messagebox.showwarning("Avertissement", "Aucun produit disponible. Veuillez ajouter des produits dans les paramètres.")
+            self.window.destroy()
+            return
         self.produit_var.set(produits[0] if produits else "Aucun")
         tk.OptionMenu(frame, self.produit_var, *produits).grid(row=1, column=1, padx=5, pady=5)
+
 
         # Épaisseur
         tk.Label(frame, text="Épaisseur").grid(row=2, column=0, padx=5, pady=5, sticky="w")

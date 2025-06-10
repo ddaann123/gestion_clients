@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+
 class ParamManager:
     def __init__(self, parent, db_manager):
         self.db_manager = db_manager
@@ -130,9 +131,6 @@ class ParamManager:
                 messagebox.showinfo("Succès", "Entrée supprimée")
             except Exception as e:
                 messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
-
-
-
 
 
 class MainDoeuvreForm:
@@ -487,6 +485,561 @@ class ProduitsBetonWindow:
             except Exception as e:
                 messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
 
+class PensionForm:
+    def __init__(self, parent, db_manager, pension_data=None):
+        self.db_manager = db_manager
+        self.pension_data = pension_data
+        self.window = tk.Toplevel(parent)
+        self.window.title("Ajouter Pension" if pension_data is None else "Modifier Pension")
+        self.window.geometry("400x200")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        frame = ttk.LabelFrame(self.window, text="Informations Pension", padding=10)
+        frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        fields = [
+            ("Type de pension", tk.StringVar(value="Aucune")),
+            ("Montant par jour (CAD)", tk.DoubleVar())
+        ]
+        self.entries = {}
+        for i, (label, var) in enumerate(fields):
+            tk.Label(frame, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="w")
+            if label == "Type de pension":
+                widget = ttk.Combobox(frame, textvariable=var, values=["Aucune", "Standard 120 km", "Éloigné 300km"], state="readonly", width=27)
+            else:
+                widget = tk.Entry(frame, textvariable=var, width=30)
+            widget.grid(row=i, column=1, padx=5, pady=5)
+            self.entries[label] = var
+
+        if pension_data:
+            self.entries["Type de pension"].set(pension_data[1])
+            self.entries["Montant par jour (CAD)"].set(pension_data[2])
+
+        tk.Button(frame, text="Enregistrer", command=self.save_pension).grid(row=len(fields), column=0, columnspan=2, pady=10)
+        tk.Button(frame, text="Annuler", command=self.window.destroy).grid(row=len(fields)+1, column=0, columnspan=2, pady=5)
+
+    def save_pension(self):
+        try:
+            type_pension = self.entries["Type de pension"].get()
+            montant_par_jour = self.entries["Montant par jour (CAD)"].get()
+            if montant_par_jour < 0:
+                raise ValueError("Le montant par jour ne peut pas être négatif")
+
+            if self.pension_data:
+                success = self.db_manager.update_pension(self.pension_data[0], type_pension, montant_par_jour)
+                if success:
+                    messagebox.showinfo("Succès", "Pension modifiée")
+                else:
+                    raise ValueError("Erreur lors de la modification (type de pension invalide ?)")
+            else:
+                success = self.db_manager.add_pension(type_pension, montant_par_jour)
+                if success:
+                    messagebox.showinfo("Succès", "Pension ajoutée")
+                else:
+                    raise ValueError("Erreur lors de l'ajout (type de pension invalide ?)")
+            self.window.destroy()
+        except ValueError as e:
+            messagebox.showerror("Erreur", str(e))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur d'enregistrement : {e}")
+
+class PensionWindow:
+    def __init__(self, parent, db_manager):
+        self.db_manager = db_manager
+        self.window = tk.Toplevel(parent)
+        self.window.title("Gestion des Pensions")
+        self.window.geometry("600x400")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        main_frame = ttk.Frame(self.window)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        pension_frame = ttk.LabelFrame(main_frame, text="Pensions", padding=10)
+        pension_frame.pack(fill="both", expand=True, pady=5)
+
+        self.pension_tree = ttk.Treeview(pension_frame, columns=("ID", "Type de pension", "Montant par jour"), show="headings")
+        self.pension_tree.heading("ID", text="ID")
+        self.pension_tree.heading("Type de pension", text="Type de pension")
+        self.pension_tree.heading("Montant par jour", text="Montant par jour (CAD)")
+        self.pension_tree.column("ID", width=50)
+        self.pension_tree.column("Type de pension", width=200)
+        self.pension_tree.column("Montant par jour", width=150)
+        self.pension_tree.pack(fill="both", expand=True)
+
+        action_frame = ttk.Frame(pension_frame)
+        action_frame.pack(fill="x", pady=5)
+        tk.Button(action_frame, text="Ajouter", command=self.add_pension).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Modifier", command=self.edit_pension).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Supprimer", command=self.delete_pension).pack(side="left", padx=5)
+
+        self.load_pensions()
+
+    def load_pensions(self):
+        for item in self.pension_tree.get_children():
+            self.pension_tree.delete(item)
+        pensions = self.db_manager.get_pensions()
+        for pension in pensions:
+            self.pension_tree.insert("", "end", values=pension)
+
+    def add_pension(self):
+        form = PensionForm(self.window, self.db_manager)
+        self.window.wait_window(form.window)
+        self.load_pensions()
+
+    def edit_pension(self):
+        selected = self.pension_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        pension_data = self.pension_tree.item(selected[0])["values"]
+        form = PensionForm(self.window, self.db_manager, pension_data)
+        self.window.wait_window(form.window)
+        self.load_pensions()
+
+    def delete_pension(self):
+        selected = self.pension_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        pension_id = self.pension_tree.item(selected[0])["values"][0]
+        if messagebox.askyesno("Confirmation", "Voulez-vous supprimer cette entrée ?"):
+            try:
+                self.db_manager.delete_pension(pension_id)
+                self.load_pensions()
+                messagebox.showinfo("Succès", "Entrée supprimée")
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
+
+class MachinerieForm:
+    def __init__(self, parent, db_manager, machinerie_data=None):
+        self.db_manager = db_manager
+        self.machinerie_data = machinerie_data
+        self.window = tk.Toplevel(parent)
+        self.window.title("Ajouter Machinerie" if machinerie_data is None else "Modifier Machinerie")
+        self.window.geometry("400x200")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        frame = ttk.LabelFrame(self.window, text="Informations Machinerie", padding=10)
+        frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        fields = [
+            ("Type de machinerie", tk.StringVar()),
+            ("Taux horaire (CAD/h)", tk.DoubleVar())
+        ]
+        self.entries = {}
+        for i, (label, var) in enumerate(fields):
+            tk.Label(frame, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="w")
+            widget = tk.Entry(frame, textvariable=var, width=30)
+            widget.grid(row=i, column=1, padx=5, pady=5)
+            self.entries[label] = var
+
+        if machinerie_data:
+            self.entries["Type de machinerie"].set(machinerie_data[1])
+            self.entries["Taux horaire (CAD/h)"].set(machinerie_data[2])
+
+        tk.Button(frame, text="Enregistrer", command=self.save_machinerie).grid(row=len(fields), column=0, columnspan=2, pady=10)
+        tk.Button(frame, text="Annuler", command=self.window.destroy).grid(row=len(fields)+1, column=0, columnspan=2, pady=5)
+
+    def save_machinerie(self):
+        try:
+            type_machinerie = self.entries["Type de machinerie"].get().strip()
+            if not type_machinerie:
+                raise ValueError("Le type de machinerie est requis")
+            taux_horaire = self.entries["Taux horaire (CAD/h)"].get()
+            if taux_horaire <= 0:
+                raise ValueError("Le taux horaire doit être positif")
+
+            if self.machinerie_data:
+                success = self.db_manager.update_machinerie(self.machinerie_data[0], type_machinerie, taux_horaire)
+                if success:
+                    messagebox.showinfo("Succès", "Machinerie modifiée")
+                else:
+                    raise ValueError("Erreur lors de la modification")
+            else:
+                success = self.db_manager.add_machinerie(type_machinerie, taux_horaire)
+                if success:
+                    messagebox.showinfo("Succès", "Machinerie ajoutée")
+                else:
+                    raise ValueError("Erreur lors de l'ajout")
+            self.window.destroy()
+        except ValueError as e:
+            messagebox.showerror("Erreur", str(e))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur d'enregistrement : {e}")
+
+class MachinerieWindow:
+    def __init__(self, parent, db_manager):
+        self.db_manager = db_manager
+        self.window = tk.Toplevel(parent)
+        self.window.title("Gestion des Machineries")
+        self.window.geometry("600x400")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        main_frame = ttk.Frame(self.window)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        machinerie_frame = ttk.LabelFrame(main_frame, text="Machineries", padding=10)
+        machinerie_frame.pack(fill="both", expand=True, pady=5)
+
+        self.machinerie_tree = ttk.Treeview(machinerie_frame, columns=("ID", "Type de machinerie", "Taux horaire"), show="headings")
+        self.machinerie_tree.heading("ID", text="ID")
+        self.machinerie_tree.heading("Type de machinerie", text="Type de machinerie")
+        self.machinerie_tree.heading("Taux horaire", text="Taux horaire (CAD/h)")
+        self.machinerie_tree.column("ID", width=50)
+        self.machinerie_tree.column("Type de machinerie", width=200)
+        self.machinerie_tree.column("Taux horaire", width=150)
+        self.machinerie_tree.pack(fill="both", expand=True)
+
+        action_frame = ttk.Frame(machinerie_frame)
+        action_frame.pack(fill="x", pady=5)
+        tk.Button(action_frame, text="Ajouter", command=self.add_machinerie).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Modifier", command=self.edit_machinerie).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Supprimer", command=self.delete_machinerie).pack(side="left", padx=5)
+
+        self.load_machineries()
+
+    def load_machineries(self):
+        for item in self.machinerie_tree.get_children():
+            self.machinerie_tree.delete(item)
+        machineries = self.db_manager.get_machinerie()
+        for machinerie in machineries:
+            self.machinerie_tree.insert("", "end", values=machinerie)
+
+    def add_machinerie(self):
+        form = MachinerieForm(self.window, self.db_manager)
+        self.window.wait_window(form.window)
+        self.load_machineries()
+
+    def edit_machinerie(self):
+        selected = self.machinerie_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        machinerie_data = self.machinerie_tree.item(selected[0])["values"]
+        form = MachinerieForm(self.window, self.db_manager, machinerie_data)
+        self.window.wait_window(form.window)
+        self.load_machineries()
+
+    def delete_machinerie(self):
+        selected = self.machinerie_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        machinerie_id = self.machinerie_tree.item(selected[0])["values"][0]
+        if messagebox.askyesno("Confirmation", "Voulez-vous supprimer cette entrée ?"):
+            try:
+                self.db_manager.delete_machinerie(machinerie_id)
+                self.load_machineries()
+                messagebox.showinfo("Succès", "Entrée supprimée")
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
+
+class AppretsScellantsForm:
+    def __init__(self, parent, db_manager, apprets_scellants_data=None):
+        self.db_manager = db_manager
+        self.apprets_scellants_data = apprets_scellants_data
+        self.window = tk.Toplevel(parent)
+        self.window.title("Ajouter Apprêt/Scellant" if apprets_scellants_data is None else "Modifier Apprêt/Scellant")
+        self.window.geometry("400x300")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        frame = ttk.LabelFrame(self.window, text="Informations Apprêt/Scellant", padding=10)
+        frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        fields = [
+            ("Nom du produit", tk.StringVar()),
+            ("Prix ($)", tk.DoubleVar()),
+            ("Format (Litres)", tk.DoubleVar()),
+            ("Couverture (pi²/contenant)", tk.DoubleVar())
+        ]
+        self.entries = {}
+        for i, (label, var) in enumerate(fields):
+            tk.Label(frame, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="w")
+            widget = tk.Entry(frame, textvariable=var, width=30)
+            widget.grid(row=i, column=1, padx=5, pady=5)
+            self.entries[label] = var
+
+        if apprets_scellants_data:
+            self.entries["Nom du produit"].set(apprets_scellants_data[1])
+            self.entries["Prix ($)"].set(apprets_scellants_data[2])
+            self.entries["Format (Litres)"].set(apprets_scellants_data[3])
+            self.entries["Couverture (pi²/contenant)"].set(apprets_scellants_data[4])
+
+        tk.Button(frame, text="Enregistrer", command=self.save_apprets_scellants).grid(row=len(fields), column=0, columnspan=2, pady=10)
+        tk.Button(frame, text="Annuler", command=self.window.destroy).grid(row=len(fields)+1, column=0, columnspan=2, pady=5)
+
+    def save_apprets_scellants(self):
+        try:
+            nom_produit = self.entries["Nom du produit"].get().strip()
+            if not nom_produit:
+                raise ValueError("Le nom du produit est requis")
+            prix = self.entries["Prix ($)"].get()
+            if prix <= 0:
+                raise ValueError("Le prix doit être positif")
+            format_litres = self.entries["Format (Litres)"].get()
+            if format_litres <= 0:
+                raise ValueError("Le format en litres doit être positif")
+            couverture_pi2 = self.entries["Couverture (pi²/contenant)"].get()
+            if couverture_pi2 <= 0:
+                raise ValueError("La couverture doit être positive")
+
+            if self.apprets_scellants_data:
+                success = self.db_manager.update_apprets_scellants(
+                    self.apprets_scellants_data[0], nom_produit, prix, format_litres, couverture_pi2
+                )
+                if success:
+                    messagebox.showinfo("Succès", "Apprêt/Scellant modifié")
+                else:
+                    raise ValueError("Erreur lors de la modification")
+            else:
+                success = self.db_manager.add_apprets_scellants(nom_produit, prix, format_litres, couverture_pi2)
+                if success:
+                    messagebox.showinfo("Succès", "Apprêt/Scellant ajouté")
+                else:
+                    raise ValueError("Erreur lors de l'ajout")
+            self.window.destroy()
+        except ValueError as e:
+            messagebox.showerror("Erreur", str(e))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur d'enregistrement : {e}")
+
+class AppretsScellantsWindow:
+    def __init__(self, parent, db_manager):
+        self.db_manager = db_manager
+        self.window = tk.Toplevel(parent)
+        self.window.title("Gestion des Apprêts/Scellants")
+        self.window.geometry("800x400")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        main_frame = ttk.Frame(self.window)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        apprets_scellants_frame = ttk.LabelFrame(main_frame, text="Apprêts/Scellants", padding=10)
+        apprets_scellants_frame.pack(fill="both", expand=True, pady=5)
+
+        self.apprets_scellants_tree = ttk.Treeview(apprets_scellants_frame, columns=("ID", "Nom du produit", "Prix", "Format", "Couverture"), show="headings")
+        self.apprets_scellants_tree.heading("ID", text="ID")
+        self.apprets_scellants_tree.heading("Nom du produit", text="Nom du produit")
+        self.apprets_scellants_tree.heading("Prix", text="Prix ($)")
+        self.apprets_scellants_tree.heading("Format", text="Format (Litres)")
+        self.apprets_scellants_tree.heading("Couverture", text="Couverture (pi²/contenant)")
+        self.apprets_scellants_tree.column("ID", width=50)
+        self.apprets_scellants_tree.column("Nom du produit", width=200)
+        self.apprets_scellants_tree.column("Prix", width=100)
+        self.apprets_scellants_tree.column("Format", width=100)
+        self.apprets_scellants_tree.column("Couverture", width=150)
+        self.apprets_scellants_tree.pack(fill="both", expand=True)
+
+        action_frame = ttk.Frame(apprets_scellants_frame)
+        action_frame.pack(fill="x", pady=5)
+        tk.Button(action_frame, text="Ajouter", command=self.add_apprets_scellants).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Modifier", command=self.edit_apprets_scellants).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Supprimer", command=self.delete_apprets_scellants).pack(side="left", padx=5)
+
+        self.load_apprets_scellants()
+
+    def load_apprets_scellants(self):
+        for item in self.apprets_scellants_tree.get_children():
+            self.apprets_scellants_tree.delete(item)
+        apprets_scellants = self.db_manager.get_apprets_scellants()
+        for entry in apprets_scellants:
+            self.apprets_scellants_tree.insert("", "end", values=entry)
+
+    def add_apprets_scellants(self):
+        form = AppretsScellantsForm(self.window, self.db_manager)
+        self.window.wait_window(form.window)
+        self.load_apprets_scellants()
+
+    def edit_apprets_scellants(self):
+        selected = self.apprets_scellants_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        apprets_scellants_data = self.apprets_scellants_tree.item(selected[0])["values"]
+        form = AppretsScellantsForm(self.window, self.db_manager, apprets_scellants_data)
+        self.window.wait_window(form.window)
+        self.load_apprets_scellants()
+
+    def delete_apprets_scellants(self):
+        selected = self.apprets_scellants_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        apprets_scellants_id = self.apprets_scellants_tree.item(selected[0])["values"][0]
+        if messagebox.askyesno("Confirmation", "Voulez-vous supprimer cette entrée ?"):
+            try:
+                self.db_manager.delete_apprets_scellants(apprets_scellants_id)
+                self.load_apprets_scellants()
+                messagebox.showinfo("Succès", "Entrée supprimée")
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
+
+class MembranesForm:
+    def __init__(self, parent, db_manager, membranes_data=None):
+        self.db_manager = db_manager
+        self.membranes_data = membranes_data
+        self.window = tk.Toplevel(parent)
+        self.window.title("Ajouter Membrane" if membranes_data is None else "Modifier Membrane")
+        self.window.geometry("400x400")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        frame = ttk.LabelFrame(self.window, text="Informations Membrane", padding=10)
+        frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        fields = [
+            ("Modèle de membrane", tk.StringVar()),
+            ("Couverture (pi²)", tk.DoubleVar()),
+            ("Prix par rouleau ($)", tk.DoubleVar()),
+            ("Prix au pi² membrane ($)", tk.DoubleVar()),
+            ("Pose au pi² sans divisions ($)", tk.DoubleVar()),
+            ("Pose au pi² avec divisions ($)", tk.DoubleVar())
+        ]
+        self.entries = {}
+        for i, (label, var) in enumerate(fields):
+            tk.Label(frame, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="w")
+            widget = tk.Entry(frame, textvariable=var, width=30)
+            widget.grid(row=i, column=1, padx=5, pady=5)
+            self.entries[label] = var
+
+        if membranes_data:
+            self.entries["Modèle de membrane"].set(membranes_data[1])
+            self.entries["Couverture (pi²)"].set(membranes_data[2])
+            self.entries["Prix par rouleau ($)"].set(membranes_data[3])
+            self.entries["Prix au pi² membrane ($)"].set(membranes_data[4])
+            self.entries["Pose au pi² sans divisions ($)"].set(membranes_data[5])
+            self.entries["Pose au pi² avec divisions ($)"].set(membranes_data[6])
+
+        tk.Button(frame, text="Enregistrer", command=self.save_membranes).grid(row=len(fields), column=0, columnspan=2, pady=10)
+        tk.Button(frame, text="Annuler", command=self.window.destroy).grid(row=len(fields)+1, column=0, columnspan=2, pady=5)
+
+    def save_membranes(self):
+        try:
+            modele_membrane = self.entries["Modèle de membrane"].get().strip()
+            if not modele_membrane:
+                raise ValueError("Le modèle de membrane est requis")
+            couverture_pi2 = self.entries["Couverture (pi²)"].get()
+            if couverture_pi2 <= 0:
+                raise ValueError("La couverture doit être positive")
+            prix_rouleau = self.entries["Prix par rouleau ($)"].get()
+            if prix_rouleau <= 0:
+                raise ValueError("Le prix par rouleau doit être positif")
+            prix_pi2_membrane = self.entries["Prix au pi² membrane ($)"].get()
+            if prix_pi2_membrane <= 0:
+                raise ValueError("Le prix au pi² doit être positif")
+            pose_pi2_sans_divisions = self.entries["Pose au pi² sans divisions ($)"].get()
+            if pose_pi2_sans_divisions <= 0:
+                raise ValueError("Le coût de pose sans divisions doit être positif")
+            pose_pi2_avec_divisions = self.entries["Pose au pi² avec divisions ($)"].get()
+            if pose_pi2_avec_divisions <= 0:
+                raise ValueError("Le coût de pose avec divisions doit être positif")
+
+            if self.membranes_data:
+                success = self.db_manager.update_membranes(
+                    self.membranes_data[0], modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions
+                )
+                if success:
+                    messagebox.showinfo("Succès", "Membrane modifiée")
+                else:
+                    raise ValueError("Erreur lors de la modification")
+            else:
+                success = self.db_manager.add_membranes(
+                    modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions
+                )
+                if success:
+                    messagebox.showinfo("Succès", "Membrane ajoutée")
+                else:
+                    raise ValueError("Erreur lors de l'ajout")
+            self.window.destroy()
+        except ValueError as e:
+            messagebox.showerror("Erreur", str(e))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur d'enregistrement : {e}")
+
+class MembranesWindow:
+    def __init__(self, parent, db_manager):
+        self.db_manager = db_manager
+        self.window = tk.Toplevel(parent)
+        self.window.title("Gestion des Membranes")
+        self.window.geometry("1000x400")
+        self.window.transient(parent)
+        self.window.grab_set()
+
+        main_frame = ttk.Frame(self.window)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        membranes_frame = ttk.LabelFrame(main_frame, text="Membranes", padding=10)
+        membranes_frame.pack(fill="both", expand=True, pady=5)
+
+        self.membranes_tree = ttk.Treeview(membranes_frame, columns=("ID", "Modèle", "Couverture", "Prix Rouleau", "Prix pi²", "Pose sans divisions", "Pose avec divisions"), show="headings")
+        self.membranes_tree.heading("ID", text="ID")
+        self.membranes_tree.heading("Modèle", text="Modèle de membrane")
+        self.membranes_tree.heading("Couverture", text="Couverture (pi²)")
+        self.membranes_tree.heading("Prix Rouleau", text="Prix par rouleau ($)")
+        self.membranes_tree.heading("Prix pi²", text="Prix au pi² ($)")
+        self.membranes_tree.heading("Pose sans divisions", text="Pose sans divisions ($/pi²)")
+        self.membranes_tree.heading("Pose avec divisions", text="Pose avec divisions ($/pi²)")
+        self.membranes_tree.column("ID", width=50)
+        self.membranes_tree.column("Modèle", width=200)
+        self.membranes_tree.column("Couverture", width=100)
+        self.membranes_tree.column("Prix Rouleau", width=100)
+        self.membranes_tree.column("Prix pi²", width=100)
+        self.membranes_tree.column("Pose sans divisions", width=150)
+        self.membranes_tree.column("Pose avec divisions", width=150)
+        self.membranes_tree.pack(fill="both", expand=True)
+
+        action_frame = ttk.Frame(membranes_frame)
+        action_frame.pack(fill="x", pady=5)
+        tk.Button(action_frame, text="Ajouter", command=self.add_membranes).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Modifier", command=self.edit_membranes).pack(side="left", padx=5)
+        tk.Button(action_frame, text="Supprimer", command=self.delete_membranes).pack(side="left", padx=5)
+
+        self.load_membranes()
+
+    def load_membranes(self):
+        for item in self.membranes_tree.get_children():
+            self.membranes_tree.delete(item)
+        membranes = self.db_manager.get_membranes()
+        for entry in membranes:
+            self.membranes_tree.insert("", "end", values=entry)
+
+    def add_membranes(self):
+        form = MembranesForm(self.window, self.db_manager)
+        self.window.wait_window(form.window)
+        self.load_membranes()
+
+    def edit_membranes(self):
+        selected = self.membranes_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        membranes_data = self.membranes_tree.item(selected[0])["values"]
+        form = MembranesForm(self.window, self.db_manager, membranes_data)
+        self.window.wait_window(form.window)
+        self.load_membranes()
+
+    def delete_membranes(self):
+        selected = self.membranes_tree.selection()
+        if not selected:
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner une entrée")
+            return
+        membranes_id = self.membranes_tree.item(selected[0])["values"][0]
+        if messagebox.askyesno("Confirmation", "Voulez-vous supprimer cette entrée ?"):
+            try:
+                self.db_manager.delete_membranes(membranes_id)
+                self.load_membranes()
+                messagebox.showinfo("Succès", "Entrée supprimée")
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
+
+
+
 class ParametersWindow:
     def __init__(self, parent, db_manager):
         self.db_manager = db_manager
@@ -519,19 +1072,20 @@ class ParametersWindow:
         ProduitsBetonWindow(self.window, self.db_manager)
 
     def open_sable_transporteurs(self):
-        messagebox.showinfo("Info", "Gestion des Sable et transporteurs non implémentée. Fournissez les champs nécessaires.")
+        ParamManager(self.window, self.db_manager)  # Utilise ParamManager pour gérer la table sable
 
     def open_membranes(self):
-        messagebox.showinfo("Info", "Gestion des Membranes non implémentée. Fournissez les champs nécessaires.")
+        MembranesWindow(self.window, self.db_manager)
 
     def open_scellant_apprets(self):
-        messagebox.showinfo("Info", "Gestion des Scellant et apprêts non implémentée. Fournissez les champs nécessaires.")
+        AppretsScellantsWindow(self.window, self.db_manager)
 
     def open_main_doeuvre(self):
         MainDoeuvreWindow(self.window, self.db_manager)
 
     def open_machinerie(self):
-        messagebox.showinfo("Info", "Gestion des Machinerie non implémentée. Fournissez les champs nécessaires.")
+        MachinerieWindow(self.window, self.db_manager)
 
     def open_pensions(self):
-        messagebox.showinfo("Info", "Gestion des Pensions non implémentée. Fournissez les champs nécessaires.")
+        PensionWindow(self.window, self.db_manager)
+

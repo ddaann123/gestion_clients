@@ -86,5 +86,48 @@ def init_database(db_path):
                 taux_horaire_transport REAL NOT NULL
             )
         """)
+
+        # Table pensions
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pensions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_pension TEXT NOT NULL CHECK(type_pension IN ('Aucune', 'Standard 120 km', 'Éloigné 300km')),
+                montant_par_jour REAL NOT NULL
+            )
+        """)
         
+
+        # Table machinerie
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS machinerie (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_machinerie TEXT NOT NULL,
+                taux_horaire REAL NOT NULL
+            )
+        """)
+
+        # Table apprets_scellants
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS apprets_scellants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom_produit TEXT NOT NULL,
+                prix REAL NOT NULL,
+                format_litres REAL NOT NULL,
+                couverture_pi2 REAL NOT NULL
+            )
+        """)
+        
+        # Table membranes
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS membranes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                modele_membrane TEXT NOT NULL,
+                couverture_pi2 REAL NOT NULL,
+                prix_rouleau REAL NOT NULL,
+                prix_pi2_membrane REAL NOT NULL,
+                pose_pi2_sans_divisions REAL NOT NULL,
+                pose_pi2_avec_divisions REAL NOT NULL
+            )
+        """)
+
         conn.commit()

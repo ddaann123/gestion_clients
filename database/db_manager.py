@@ -57,13 +57,13 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM sable WHERE id = ?", (sable_id,))
             conn.commit()
-    
+
     def get_clients(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, nom, courriel, telephone, adresse FROM clients")
             return cursor.fetchall()
-    
+
     def search_clients(self, query):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -246,3 +246,158 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM produits WHERE nom = ?", (nom,))
             conn.commit()
+
+
+    def get_pensions(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, type_pension, montant_par_jour FROM pensions")
+            return cursor.fetchall()
+    
+    def add_pension(self, type_pension, montant_par_jour):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO pensions (type_pension, montant_par_jour)
+                    VALUES (?, ?)
+                """, (type_pension, montant_par_jour))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si la contrainte CHECK est violée
+    
+    def update_pension(self, pension_id, type_pension, montant_par_jour):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE pensions SET type_pension = ?, montant_par_jour = ?
+                    WHERE id = ?
+                """, (type_pension, montant_par_jour, pension_id))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si la contrainte CHECK est violée
+    
+    def delete_pension(self, pension_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM pensions WHERE id = ?", (pension_id,))
+            conn.commit()
+
+    def get_machinerie(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, type_machinerie, taux_horaire FROM machinerie")
+            return cursor.fetchall()
+    
+    def add_machinerie(self, type_machinerie, taux_horaire):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO machinerie (type_machinerie, taux_horaire)
+                    VALUES (?, ?)
+                """, (type_machinerie, taux_horaire))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si une contrainte est violée
+    
+    def update_machinerie(self, machinerie_id, type_machinerie, taux_horaire):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE machinerie SET type_machinerie = ?, taux_horaire = ?
+                    WHERE id = ?
+                """, (type_machinerie, taux_horaire, machinerie_id))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si une contrainte est violée
+    
+    def delete_machinerie(self, machinerie_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM machinerie WHERE id = ?", (machinerie_id,))
+            conn.commit()
+
+    
+    def get_apprets_scellants(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nom_produit, prix, format_litres, couverture_pi2 FROM apprets_scellants")
+            return cursor.fetchall()
+    
+    def add_apprets_scellants(self, nom_produit, prix, format_litres, couverture_pi2):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO apprets_scellants (nom_produit, prix, format_litres, couverture_pi2)
+                    VALUES (?, ?, ?, ?)
+                """, (nom_produit, prix, format_litres, couverture_pi2))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si une contrainte est violée
+    
+    def update_apprets_scellants(self, apprets_scellants_id, nom_produit, prix, format_litres, couverture_pi2):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE apprets_scellants SET nom_produit = ?, prix = ?, format_litres = ?, couverture_pi2 = ?
+                    WHERE id = ?
+                """, (nom_produit, prix, format_litres, couverture_pi2, apprets_scellants_id))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si une contrainte est violée
+    
+    def delete_apprets_scellants(self, apprets_scellants_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM apprets_scellants WHERE id = ?", (apprets_scellants_id,))
+            conn.commit()
+    
+    def get_membranes(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions FROM membranes")
+            return cursor.fetchall()
+    
+    def add_membranes(self, modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO membranes (modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si une contrainte est violée
+    
+    def update_membranes(self, membranes_id, modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE membranes SET modele_membrane = ?, couverture_pi2 = ?, prix_rouleau = ?, prix_pi2_membrane = ?, pose_pi2_sans_divisions = ?, pose_pi2_avec_divisions = ?
+                    WHERE id = ?
+                """, (modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions, membranes_id))
+                conn.commit()
+                return True
+        except sqlite3.IntegrityError:
+            return False  # Retourne False si une contrainte est violée
+    
+    def delete_membranes(self, membranes_id):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM membranes WHERE id = ?", (membranes_id,))
+            conn.commit()
+    
