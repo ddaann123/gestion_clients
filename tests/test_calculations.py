@@ -1,6 +1,6 @@
 # tests/test_calculations.py
 import unittest
-from calculations.submission_calcs import calculer_quantite_sacs
+from gui.submission_calcs import calculer_quantite_sacs
 from database.db_manager import DatabaseManager
 from config import DB_PATH
 

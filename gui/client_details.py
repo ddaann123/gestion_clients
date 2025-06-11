@@ -55,6 +55,7 @@ class ContactForm:
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur d'enregistrement : {e}")
 
+
 class ClientDetails:
     def __init__(self, parent, db_manager, client_data):
         self.db_manager = db_manager
@@ -149,8 +150,14 @@ class ClientDetails:
                 messagebox.showerror("Erreur", f"Erreur de suppression : {e}")
 
     def open_submission_form(self):
-        """Ouvre la fenêtre Feuille de calcul pour le contact sélectionné."""
+        # Vérifier si un contact est sélectionné
         if not self.selected_contact:
-            messagebox.showwarning("Avertissement", "Veuillez sélectionner un contact")
+            messagebox.showwarning("Avertissement", "Veuillez sélectionner un contact avant d'ouvrir la soumission")
             return
-        SubmissionForm(self.window, self.db_manager)
+        
+        # Récupérer les données dynamiques
+        selected_contact = self.selected_contact[1]  # Nom du contact (index 1 du tuple)
+        selected_client = self.client_data[1]       # Nom du client (index 1 de client_data)
+        
+        # Ouvrir le formulaire de soumission avec les valeurs dynamiques
+        SubmissionForm(self.window, self.db_manager, selected_client, selected_contact)
