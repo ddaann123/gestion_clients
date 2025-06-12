@@ -4,6 +4,7 @@ from gui.client_form import ClientForm
 from gui.client_details import ClientDetails
 from gui.parameters_window import ParametersWindow
 
+
 class MainWindow:
     def __init__(self, root, db_manager):
         self.root = root

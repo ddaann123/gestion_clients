@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from gui.submission_form import SubmissionForm
 
+
 class ContactForm:
     def __init__(self, parent, db_manager, client_id, contact_data=None):
         self.db_manager = db_manager

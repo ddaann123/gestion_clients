@@ -1,7 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from .submission_calcs import calculate_distance  # Importation relative
+from .submission_calcs import calculate_distance, calculate_surface_per_mob, get_truck_tonnages
+from config import DEFAULT_USD_CAD_RATE, THICKNESS_OPTIONS, SUBFLOOR_OPTIONS, DEFAULT_SUBFLOOR, POSE_MEMBRANE_OPTIONS
+
+
+# [Le reste du code reste inchangé]
+
+# [Le reste du code reste inchangé]
 
 class ProjectNotesWindow:
     def __init__(self, parent, notes_data=None):
@@ -160,6 +166,7 @@ class DetailedSurfaceWindow:
             self.window.destroy()
 
 class SubmissionForm:
+     
     def __init__(self, parent, db_manager, selected_client=None, selected_contact=None):
         self.db_manager = db_manager
         self.selected_client = selected_client
@@ -169,9 +176,21 @@ class SubmissionForm:
         self.total_surface_var = tk.StringVar(value="0")  # Stocke la surface totale
         self.mobilizations_var = tk.StringVar(value="1.0")  # Nombre de mobilisations
         self.surface_per_mob_var = tk.StringVar(value="0.0")  # Surface par mobilisation
+        self.area_var = tk.StringVar(value="0")  # Superficie (pi²)
+        self.product_var = tk.StringVar()  # Produit sélectionné
+        self.ratio_var = tk.StringVar()  # Ratio sélectionné
+        self.usd_cad_rate_var = tk.StringVar(value=str(DEFAULT_USD_CAD_RATE))  # Taux de change USD/CAD
+        self.thickness_var = tk.StringVar(value="1-1/2\"")  # Épaisseur, défaut à 1-1/2"
+        self.subfloor_var = tk.StringVar(value=DEFAULT_SUBFLOOR)  # Type de sous-plancher
+        self.membrane_var = tk.StringVar(value="Aucune")  # Type de membrane, défaut à "Aucune"
+        self.pose_membrane_var = tk.StringVar(value="Aucune")  # Pose membrane, défaut à "Aucune"
+        # Variables pour Produits et Fournisseurs
+        self.sable_transporter_var = tk.StringVar()  # Transporteur de sable
+        self.truck_tonnage_var = tk.StringVar()  # Tonnage camion
+        self.transport_sector_var = tk.StringVar()  # Secteur de transport
         self.window = tk.Toplevel(parent)
         self.window.title("Nouvelle Soumission")
-        self.window.geometry("600x600")  # Ajusté pour les nouveaux champs
+        self.window.geometry("800x800")  # Ajusté pour la nouvelle section
         self.window.transient(parent)
         self.window.grab_set()
 
@@ -197,7 +216,7 @@ class SubmissionForm:
         # Champ Date de soumission
         tk.Label(gen_frame, text="Date de soumission (JJ-MM-AAAA) :").grid(row=2, column=0, padx=5, pady=5, sticky="w")
         self.date_var = tk.StringVar()
-        self.date_var.set(datetime.now().strftime("%d-%m-%Y"))  # Date par défaut : 10-06-2025
+        self.date_var.set(datetime.now().strftime("%d-%m-%Y"))  # Date par défaut : 11-06-2025
         tk.Entry(gen_frame, textvariable=self.date_var, width=30).grid(row=2, column=1, padx=5, pady=5)
 
         # Champ No Soumission
@@ -238,12 +257,115 @@ class SubmissionForm:
         tk.Label(proj_frame, text="Surface par mob. prévue :").grid(row=4, column=4, padx=5, pady=5, sticky="e")
         tk.Label(proj_frame, textvariable=self.surface_per_mob_var, width=10).grid(row=4, column=5, padx=5, pady=5, sticky="w")
 
-        # Binder le calcul de la surface par mobilisation
+        # Ajouter le trace pour mobilizations_var
         self.mobilizations_var.trace("w", self.update_surface_per_mob)
+
+        # Frame Paramètres de calcul
+        calc_frame = ttk.LabelFrame(self.window, text="Paramètres de Calcul", padding=10)
+        calc_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Champ Superficie (pi²)
+        tk.Label(calc_frame, text="Superficie (pi²) :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(calc_frame, textvariable=self.area_var, width=10).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        # Champ Produit
+        tk.Label(calc_frame, text="Produit :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        details = self.db_manager.get_produit_details()
+        self.products = [(d[0], d) for d in details]  # Inclure tous les produits
+        self.product_menu = tk.OptionMenu(calc_frame, self.product_var, *tuple(p[0] for p in self.products))
+        self.product_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        self.product_var.trace("w", self.update_ratio_options)
+
+        # Champ Ratio
+        tk.Label(calc_frame, text="Ratio :").grid(row=0, column=4, padx=5, pady=5, sticky="e")
+        self.ratio_menu = tk.OptionMenu(calc_frame, self.ratio_var, "")
+        self.ratio_menu.grid(row=0, column=5, padx=5, pady=5, sticky="w")
+        self.ratio_menu.config(state="disabled")  # Désactivé par défaut
+        self.update_ratio_options()  # Initialisation
+
+        # Nouveau champ Type de membrane
+        tk.Label(calc_frame, text="Type de membrane :").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        # Récupérer les modèles de membrane depuis la base de données
+        membrane_options = ["Aucune"] + [row[1] for row in self.db_manager.get_membranes()]  # Ajoute "Aucune" comme première option
+        self.membrane_menu = tk.OptionMenu(calc_frame, self.membrane_var, *membrane_options)
+        self.membrane_menu.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+        # Nouveau champ Pose membrane
+        tk.Label(calc_frame, text="Pose membrane :").grid(row=2, column=2, padx=5, pady=5, sticky="e")
+        self.pose_membrane_menu = tk.OptionMenu(calc_frame, self.pose_membrane_var, *POSE_MEMBRANE_OPTIONS)
+        self.pose_membrane_menu.grid(row=2, column=3, padx=5, pady=5, sticky="w")
+
+        
+        # Champ Taux de change USD/CAD
+        tk.Label(calc_frame, text="Taux de change USD/CAD :").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(calc_frame, textvariable=self.usd_cad_rate_var, width=10).grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        # Champ Épaisseur
+        tk.Label(calc_frame, text="Épaisseur :").grid(row=1, column=2, padx=5, pady=5, sticky="e")
+        self.thickness_menu = tk.OptionMenu(calc_frame, self.thickness_var, *THICKNESS_OPTIONS)
+        self.thickness_menu.grid(row=1, column=3, padx=5, pady=5, sticky="w")
+
+        # Champ Type de sous-plancher
+        tk.Label(calc_frame, text="Type de sous-plancher :").grid(row=1, column=4, padx=5, pady=5, sticky="e")
+        self.subfloor_menu = tk.OptionMenu(calc_frame, self.subfloor_var, *SUBFLOOR_OPTIONS)
+        self.subfloor_menu.grid(row=1, column=5, padx=5, pady=5, sticky="w")
+        self.subfloor_var.set(DEFAULT_SUBFLOOR)  # Définir la valeur par défaut
+
+        # Nouvelle section Produits et Fournisseurs
+        prod_frame = ttk.LabelFrame(self.window, text="Produits et Fournisseurs", padding=10)
+        prod_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Champ Transporteur de sable
+        tk.Label(prod_frame, text="Transporteur de sable :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        # Récupérer les transporteurs uniques depuis la table sable
+        sable_data = self.db_manager.get_sable()
+        transporters = sorted(set(row[1] for row in sable_data))  # Colonne 1 est transporteur
+        self.sable_transporter_menu = tk.OptionMenu(prod_frame, self.sable_transporter_var, *transporters)
+        self.sable_transporter_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self.sable_transporter_var.trace("w", self.update_truck_tonnage_options)  # Mettre à jour le tonnage dynamiquement
+
+        # Champ Tonnage camion (tm)
+        tk.Label(prod_frame, text="Tonnage camion (tm) :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        self.truck_tonnage_menu = tk.OptionMenu(prod_frame, self.truck_tonnage_var, "")
+        self.truck_tonnage_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+
+        # Nouveau champ Secteur de transport
+        tk.Label(prod_frame, text="Secteur de transport :").grid(row=0, column=4, padx=5, pady=5, sticky="e")
+        self.transport_sector_menu = tk.OptionMenu(prod_frame, self.transport_sector_var, "")
+        self.transport_sector_menu.grid(row=0, column=5, padx=5, pady=5, sticky="w")
 
         # Boutons
         tk.Button(self.window, text="Enregistrer", command=self.save_submission).pack(pady=10)
         tk.Button(self.window, text="Annuler", command=self.window.destroy).pack(pady=5)
+
+
+    def update_truck_tonnage_options(self, *args):
+        """Mettre à jour les options de tonnage et secteur en fonction du transporteur sélectionné."""
+        selected_transporter = self.sable_transporter_var.get()
+        truck_tonnages = get_truck_tonnages(self.db_manager, selected_transporter) if selected_transporter else []
+        transport_sectors = sorted(set(row[3] for row in self.db_manager.get_sable() if row[1] == selected_transporter)) if selected_transporter else []
+
+        # Mettre à jour le menu Tonnage camion
+        menu_tonnage = self.truck_tonnage_menu["menu"]
+        menu_tonnage.delete(0, "end")
+        for tonnage in truck_tonnages:
+            menu_tonnage.add_command(label=str(tonnage), command=lambda x=str(tonnage): self.truck_tonnage_var.set(x))
+        self.truck_tonnage_menu.config(state="normal" if truck_tonnages else "disabled")
+        if truck_tonnages:
+            self.truck_tonnage_var.set(str(truck_tonnages[0]))  # Définir le premier tonnage par défaut
+        else:
+            self.truck_tonnage_var.set("")
+
+        # Mettre à jour le menu Secteur de transport
+        menu_sector = self.transport_sector_menu["menu"]
+        menu_sector.delete(0, "end")
+        for sector in transport_sectors:
+            menu_sector.add_command(label=sector, command=lambda x=sector: self.transport_sector_var.set(x))
+        self.transport_sector_menu.config(state="normal" if transport_sectors else "disabled")
+        if transport_sectors:
+            self.transport_sector_var.set(transport_sectors[0])  # Définir la première ville par défaut
+        else:
+            self.transport_sector_var.set("")
 
     def generate_submission_number(self):
         current_year = datetime.now().year
@@ -268,12 +390,18 @@ class SubmissionForm:
             distance = self.distance_var.get()
             notes = self.notes_data  # Inclure les notes temporaires
             surfaces = self.surface_data  # Inclure les surfaces temporaires
+            area = self.area_var.get()
+            product = self.product_var.get()
+            ratio = self.ratio_var.get()
+            usd_cad_rate = self.usd_cad_rate_var.get()
+            thickness = self.thickness_var.get()
+            subfloor = self.subfloor_var.get()
 
-            if not client_name or not contact or not date_submission or not projet or not ville:
+            if not client_name or not contact or not date_submission or not projet or not ville or not area:
                 raise ValueError("Tous les champs sont requis")
 
             # Pour l'instant, afficher les données (sauvegarde dans la base à venir)
-            message = f"Soumission {submission_number} prête à être sauvegardée.\nNotes : {notes}\nSurfaces : {surfaces}"
+            message = f"Soumission {submission_number} prête à être sauvegardée.\nNotes : {notes}\nSurfaces : {surfaces}\nParamètres : Superficie={area}, Produit={product}, Ratio={ratio}, Taux USD/CAD={usd_cad_rate}, Épaisseur={thickness}, Type de sous-plancher={subfloor}"
             messagebox.showinfo("Info", message)
             self.window.destroy()  # Ferme la fenêtre et efface les données
             self.notes_data.clear()  # Efface les notes après enregistrement
@@ -301,14 +429,35 @@ class SubmissionForm:
             self.total_surface_var.set(str(total))
             self.update_surface_per_mob()  # Recalculer la surface par mobilisation
 
+
+
+  
     def update_surface_per_mob(self, *args):
         try:
             total = int(self.total_surface_var.get() or 0)
             mobilizations = float(self.mobilizations_var.get() or 1.0)
-            if mobilizations == 0:
-                self.surface_per_mob_var.set("Erreur")
-            else:
-                result = total / mobilizations
-                self.surface_per_mob_var.set(f"{result:.1f}")
+            self.surface_per_mob_var.set(calculate_surface_per_mob(total, mobilizations))
         except ValueError:
             self.surface_per_mob_var.set("Erreur")
+
+
+    def update_ratio_options(self, *args):
+        product_name = self.product_var.get()
+        if product_name:
+            product_details = next((d for d in self.db_manager.get_produit_details() if d[0] == product_name), None)
+            if product_details and product_details[5] == "COUVERTURE":
+                self.ratio_var.set("")
+                self.ratio_menu.config(state="disabled")
+            else:
+                ratios = self.db_manager.get_produit_ratios(product_name)
+                menu = self.ratio_menu["menu"]
+                menu.delete(0, "end")
+                default_ratio = next((r[1] for r in ratios if r[2] == 1), None)  # Trouver le ratio par défaut
+                for ratio in ratios:
+                    menu.add_command(label=str(ratio[1]), command=lambda x=str(ratio[1]): self.ratio_var.set(x))
+                self.ratio_menu.config(state="normal")
+                if default_ratio is not None:
+                    self.ratio_var.set(str(default_ratio))  # Définir le ratio par défaut
+        else:
+            self.ratio_var.set("")
+            self.ratio_menu.config(state="disabled")
