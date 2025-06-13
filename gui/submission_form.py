@@ -1,13 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from .submission_calcs import calculate_distance, calculate_surface_per_mob, get_truck_tonnages
+from .submission_calcs import calculate_distance, calculate_surface_per_mob, get_truck_tonnages, calculate_prix_par_sac, calculate_total_sacs, calculate_prix_total_sacs, calculer_quantite_sable, calculer_nombre_voyages_sable, calculer_prix_total_sable
 from config import DEFAULT_USD_CAD_RATE, THICKNESS_OPTIONS, SUBFLOOR_OPTIONS, DEFAULT_SUBFLOOR, POSE_MEMBRANE_OPTIONS
 
 
-# [Le reste du code reste inchangé]
-
-# [Le reste du code reste inchangé]
 
 class ProjectNotesWindow:
     def __init__(self, parent, notes_data=None):
@@ -177,25 +174,98 @@ class SubmissionForm:
         self.mobilizations_var = tk.StringVar(value="1.0")  # Nombre de mobilisations
         self.surface_per_mob_var = tk.StringVar(value="0.0")  # Surface par mobilisation
         self.area_var = tk.StringVar(value="0")  # Superficie (pi²)
+        self.area_var.trace("w", self.update_sealant_total)  # 🔁 observe changement de superficie
+        self.area_var.trace("w", self.update_total_sacs)
         self.product_var = tk.StringVar()  # Produit sélectionné
+        self.product_var.trace("w", self.update_ratio_options)
+        self.product_var.trace("w", self.update_prix_par_sac)
+        self.product_var.trace("w", self.update_total_sacs)
         self.ratio_var = tk.StringVar()  # Ratio sélectionné
+        self.ratio_var.trace("w", self.update_total_sacs)
         self.usd_cad_rate_var = tk.StringVar(value=str(DEFAULT_USD_CAD_RATE))  # Taux de change USD/CAD
+        self.usd_cad_rate_var.trace("w", self.update_prix_par_sac)
         self.thickness_var = tk.StringVar(value="1-1/2\"")  # Épaisseur, défaut à 1-1/2"
+        self.thickness_var.trace("w", self.update_total_sacs)
         self.subfloor_var = tk.StringVar(value=DEFAULT_SUBFLOOR)  # Type de sous-plancher
+        self.subfloor_var.trace("w", self.update_sealant_default)
         self.membrane_var = tk.StringVar(value="Aucune")  # Type de membrane, défaut à "Aucune"
         self.pose_membrane_var = tk.StringVar(value="Aucune")  # Pose membrane, défaut à "Aucune"
-        # Variables pour Produits et Fournisseurs
+        # Variables pour les nouveaux champs
         self.sable_transporter_var = tk.StringVar()  # Transporteur de sable
         self.truck_tonnage_var = tk.StringVar()  # Tonnage camion
         self.transport_sector_var = tk.StringVar()  # Secteur de transport
+        self.thaw_work_var = tk.BooleanVar(value=False)  # Travaux en dégel, défaut à False
+        self.sealant_var = tk.StringVar(value="Aucun")  # Apprets et scellants, défaut à "Aucun"
+        self.sealant_total_var = tk.StringVar(value="0.00")
+        self.sealant_var.trace("w", self.update_sealant_total)  # 🔁 observe changement de produit scellant
+        self.prix_par_sac_var = tk.StringVar(value="0.00")
+        self.total_sacs_var = tk.StringVar(value="0")
+        self.nb_sacs_var = tk.StringVar(value="0")
+        self.prix_total_sacs_var = tk.StringVar(value="0.00")
+        self.nb_sacs_var.trace("w", self.update_prix_total_sacs)
+        self.prix_par_sac_var.trace("w", self.update_prix_total_sacs)
+        self.total_sacs_var.trace("w", self.update_prix_total_sacs)
+        self.sable_total_var = tk.StringVar(value="0")
+        self.total_sacs_var.trace("w", self.update_sable_total)
+        self.ratio_var.trace("w", self.update_sable_total)
+        self.voyage_sable_var = tk.StringVar()
+        self.tonnage_camion_var = tk.StringVar(value="")  # Valeur par défaut vide ou "10" si tu préfères
+        self.nombre_voyages_var = tk.StringVar(value="0")
+        self.sable_total_var.trace("w", self.update_nombre_voyages)
+        self.truck_tonnage_var.trace("w", self.update_nombre_voyages)
+        self.prix_total_sable_var = tk.StringVar(value="0.00")
+        self.sable_transporter_var.trace("w", lambda *args: self.update_prix_total_sable())
+        self.truck_tonnage_var.trace("w", lambda *args: self.update_prix_total_sable())
+        self.sable_total_var.trace("w", lambda *args: self.update_prix_total_sable())
+        self.nombre_voyages_var.trace("w", lambda *args: self.update_prix_total_sable())
+        self.sable_transporter_var.trace("w", self.update_prix_total_sable)
+        self.truck_tonnage_var.trace("w", self.update_prix_total_sable)
+
+
+
+
         self.window = tk.Toplevel(parent)
         self.window.title("Nouvelle Soumission")
-        self.window.geometry("800x800")  # Ajusté pour la nouvelle section
+
+        self.window.geometry("950x900")  # ← tu peux ajuster ici largeur x hauteur
+
+
+        # ---- SCROLLBAR CONFIGURATION ----
+        container = ttk.Frame(self.window)
+        container.pack(fill="both", expand=True)
+
+        canvas = tk.Canvas(container)
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(
+                scrollregion=canvas.bbox("all")
+            )
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # ---- Nouveau parent pour les widgets ----
+        self.main_frame = scrollable_frame
+
         self.window.transient(parent)
         self.window.grab_set()
 
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+
+
         # Frame Informations Générales
-        gen_frame = ttk.LabelFrame(self.window, text="Informations Générales", padding=10)
+        gen_frame = ttk.LabelFrame(self.main_frame, text="Informations Générales", padding=10)
         gen_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Client (pré-rempli et non modifiable)
@@ -226,7 +296,7 @@ class SubmissionForm:
         tk.Entry(gen_frame, textvariable=self.submission_number_var, state="disabled", width=30).grid(row=3, column=1, padx=5, pady=5)
 
         # Frame Détails du Projet
-        proj_frame = ttk.LabelFrame(self.window, text="Détails du Projet", padding=10)
+        proj_frame = ttk.LabelFrame(self.main_frame, text="Détails du Projet", padding=10)
         proj_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Projet (2 lignes) et bouton Notes de projet
@@ -261,7 +331,7 @@ class SubmissionForm:
         self.mobilizations_var.trace("w", self.update_surface_per_mob)
 
         # Frame Paramètres de calcul
-        calc_frame = ttk.LabelFrame(self.window, text="Paramètres de Calcul", padding=10)
+        calc_frame = ttk.LabelFrame(self.main_frame, text="Paramètres de Calcul", padding=10)
         calc_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Superficie (pi²)
@@ -274,14 +344,14 @@ class SubmissionForm:
         self.products = [(d[0], d) for d in details]  # Inclure tous les produits
         self.product_menu = tk.OptionMenu(calc_frame, self.product_var, *tuple(p[0] for p in self.products))
         self.product_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
-        self.product_var.trace("w", self.update_ratio_options)
 
         # Champ Ratio
         tk.Label(calc_frame, text="Ratio :").grid(row=0, column=4, padx=5, pady=5, sticky="e")
         self.ratio_menu = tk.OptionMenu(calc_frame, self.ratio_var, "")
         self.ratio_menu.grid(row=0, column=5, padx=5, pady=5, sticky="w")
-        self.ratio_menu.config(state="disabled")  # Désactivé par défaut
-        self.update_ratio_options()  # Initialisation
+        self.ratio_menu.config(state="disabled")
+        self.update_ratio_options()
+
 
         # Nouveau champ Type de membrane
         tk.Label(calc_frame, text="Type de membrane :").grid(row=2, column=0, padx=5, pady=5, sticky="e")
@@ -298,7 +368,9 @@ class SubmissionForm:
         
         # Champ Taux de change USD/CAD
         tk.Label(calc_frame, text="Taux de change USD/CAD :").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        self.usd_cad_rate_var = tk.StringVar(value=str(DEFAULT_USD_CAD_RATE))
         tk.Entry(calc_frame, textvariable=self.usd_cad_rate_var, width=10).grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        self.usd_cad_rate_var.trace("w", self.update_prix_par_sac)  # 🔁 observe changement taux de change
 
         # Champ Épaisseur
         tk.Label(calc_frame, text="Épaisseur :").grid(row=1, column=2, padx=5, pady=5, sticky="e")
@@ -311,32 +383,207 @@ class SubmissionForm:
         self.subfloor_menu.grid(row=1, column=5, padx=5, pady=5, sticky="w")
         self.subfloor_var.set(DEFAULT_SUBFLOOR)  # Définir la valeur par défaut
 
-        # Nouvelle section Produits et Fournisseurs
-        prod_frame = ttk.LabelFrame(self.window, text="Produits et Fournisseurs", padding=10)
-        prod_frame.pack(padx=10, pady=10, fill="both", expand=True)
-
+        # Nouveaux champs dans Paramètres de calcul
         # Champ Transporteur de sable
-        tk.Label(prod_frame, text="Transporteur de sable :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        # Récupérer les transporteurs uniques depuis la table sable
+        tk.Label(calc_frame, text="Transporteur de sable :").grid(row=3, column=0, padx=5, pady=5, sticky="e")
         sable_data = self.db_manager.get_sable()
         transporters = sorted(set(row[1] for row in sable_data))  # Colonne 1 est transporteur
-        self.sable_transporter_menu = tk.OptionMenu(prod_frame, self.sable_transporter_var, *transporters)
-        self.sable_transporter_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self.sable_transporter_menu = tk.OptionMenu(calc_frame, self.sable_transporter_var, *transporters)
+        self.sable_transporter_menu.grid(row=3, column=1, padx=5, pady=5, sticky="w")
         self.sable_transporter_var.trace("w", self.update_truck_tonnage_options)  # Mettre à jour le tonnage dynamiquement
 
         # Champ Tonnage camion (tm)
-        tk.Label(prod_frame, text="Tonnage camion (tm) :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
-        self.truck_tonnage_menu = tk.OptionMenu(prod_frame, self.truck_tonnage_var, "")
-        self.truck_tonnage_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(calc_frame, text="Tonnage camion (tm) :").grid(row=3, column=2, padx=5, pady=5, sticky="e")
+        self.truck_tonnage_menu = tk.OptionMenu(calc_frame, self.truck_tonnage_var, "")
+        self.truck_tonnage_menu.grid(row=3, column=3, padx=5, pady=5, sticky="w")
 
-        # Nouveau champ Secteur de transport
-        tk.Label(prod_frame, text="Secteur de transport :").grid(row=0, column=4, padx=5, pady=5, sticky="e")
-        self.transport_sector_menu = tk.OptionMenu(prod_frame, self.transport_sector_var, "")
-        self.transport_sector_menu.grid(row=0, column=5, padx=5, pady=5, sticky="w")
+        # Champ Secteur de transport
+        tk.Label(calc_frame, text="Secteur de transport :").grid(row=3, column=4, padx=5, pady=5, sticky="e")
+        self.transport_sector_menu = tk.OptionMenu(calc_frame, self.transport_sector_var, "")
+        self.transport_sector_menu.grid(row=3, column=5, padx=5, pady=5, sticky="w")
+
+        # Nouveau champ Travaux en dégel
+        tk.Label(calc_frame, text="Travaux en dégel :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        self.thaw_work_check = tk.Checkbutton(calc_frame, variable=self.thaw_work_var)
+        self.thaw_work_check.grid(row=4, column=1, padx=5, pady=5, sticky="w")
+
+        # Nouvelle section Produits et Fournisseurs
+        prod_frame = ttk.LabelFrame(self.main_frame, text="Produits et Fournisseurs", padding=10)
+        prod_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Champ Apprets et scellants
+        tk.Label(prod_frame, text="Apprets et scellants :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        sealant_data = self.db_manager.get_apprets_scellants()
+        sealant_options = ["Aucun"] + sorted(set(row[1] for row in sealant_data))  # Colonne 1 est nom_produit
+        self.sealant_menu = tk.OptionMenu(prod_frame, self.sealant_var, *sealant_options)
+        self.sealant_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Label(prod_frame, text="Total scellants et apprêts ($) :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.sealant_total_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=0, column=3, padx=5, pady=5, sticky="w")
+
+        tk.Label(prod_frame, text="Prix par sac ($) :").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.prix_par_sac_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        # Champ Quantité totale de sacs
+        tk.Label(prod_frame, text="Quantité totale de sacs :").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.total_sacs_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Label(prod_frame, text="Quantité totale de sable (tm) :").grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.sable_total_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=3, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Label(prod_frame, text="Nombre voyage de sable :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.nombre_voyages_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Label(prod_frame, text="Prix total sable ($) :").grid(row=4, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.prix_total_sable_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=3, padx=5, pady=5, sticky="w")
+
+        # Champ Prix total sacs
+        tk.Label(prod_frame, text="Prix total sacs ($) :").grid(row=2, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.prix_total_sacs_var, relief="solid", width=12, borderwidth=1).grid(row=2, column=3, padx=5, pady=5, sticky="w")
+
+
 
         # Boutons
         tk.Button(self.window, text="Enregistrer", command=self.save_submission).pack(pady=10)
         tk.Button(self.window, text="Annuler", command=self.window.destroy).pack(pady=5)
+
+
+    def update_nombre_voyages(self, *args): 
+        try:
+            sable_str = self.sable_total_var.get()
+            tonnage_str = self.truck_tonnage_var.get()
+
+            print(f"[DEBUG] Valeurs récupérées : sable = {sable_str}, tonnage camion = {tonnage_str}")
+
+            # Vérifier si les champs sont vides
+            if not sable_str or not tonnage_str:
+                self.nombre_voyages_var.set("0")
+                return
+
+            voyages = calculer_nombre_voyages_sable(sable_str, tonnage_str)
+            print(f"[DEBUG] Résultat voyages : {voyages}")
+            self.nombre_voyages_var.set(voyages)
+        except Exception as e:
+            print(f"[DEBUG] Erreur dans update_nombre_voyages : {e}")
+            self.nombre_voyages_var.set("Erreur")
+        
+        self.update_prix_total_sable()
+
+
+
+    def update_prix_total_sable(self, *args):
+        try:
+            sable_str = self.sable_total_var.get()
+            voyages_str = self.nombre_voyages_var.get()
+            transporteur = self.sable_transporter_var.get()
+            type_camion = self.truck_tonnage_var.get()
+
+
+            total = calculer_prix_total_sable(self.db_manager, sable_str, voyages_str, transporteur, type_camion)
+            self.prix_total_sable_var.set(total)
+            print(f"[DEBUG] Prix total sable affiché : {total}")
+        except Exception as e:
+            print(f"[DEBUG] Erreur dans update_prix_total_sable : {e}")
+            self.prix_total_sable_var.set("Erreur")
+
+
+
+
+    def update_sable_total(self, *args):
+        nb_sacs = self.total_sacs_var.get()
+        ratio = self.ratio_var.get()
+        sable_total = calculer_quantite_sable(nb_sacs, ratio)
+        self.sable_total_var.set(sable_total)
+
+
+        if sable_total.isdigit():  # 👈 évite les erreurs si 'Erreur'
+            self.update_nombre_voyages()
+
+
+    def update_prix_total_sacs(self, *args):
+        try:
+            nb_sacs_str = self.total_sacs_var.get()
+            prix_unitaire_str = self.prix_par_sac_var.get()
+
+            print(f"[DEBUG] Valeur récupérée : total_sacs_var = '{nb_sacs_str}', prix_par_sac_var = '{prix_unitaire_str}'")
+
+            nb_sacs = int(nb_sacs_str)
+            prix_unitaire = float(prix_unitaire_str.replace(",", "."))
+
+            total = nb_sacs * prix_unitaire
+            print(f"[DEBUG] Total sacs = {nb_sacs}, Prix unitaire = {prix_unitaire}, Total = {total}")
+            self.prix_total_sacs_var.set(f"{total:.2f}")
+        except Exception as e:
+            print(f"[DEBUG] Erreur dans update_prix_total_sacs : {e}")
+            self.prix_total_sacs_var.set("0.00")
+
+    
+
+
+
+
+
+    def update_total_sacs(self, *args):
+        superficie = self.area_var.get()
+        epaisseur = self.thickness_var.get()
+        produit = self.product_var.get()
+        ratio = self.ratio_var.get()
+
+        result = calculate_total_sacs(superficie, epaisseur, produit, ratio, self.db_manager)
+        print(f"[DEBUG] Résultat total sacs : {result}")
+        self.total_sacs_var.set(result)
+
+        # ✅ Forcer le recalcul du prix total
+        self.update_prix_total_sacs()
+
+
+
+
+    def update_prix_par_sac(self, *args):
+        produit = self.product_var.get()
+        taux_change = self.usd_cad_rate_var.get()
+        if produit and taux_change:
+            result = calculate_prix_par_sac(produit, taux_change, self.db_manager)
+            self.prix_par_sac_var.set(result)
+        else:
+            self.prix_par_sac_var.set("0.00")
+
+
+
+    def update_sealant_total(self, *args):
+        try:
+            area = float(self.area_var.get().replace(",", "") or 0)
+            selected_sealant = self.sealant_var.get()
+
+            if selected_sealant == "Aucun" or not selected_sealant:
+                self.sealant_total_var.set("0.00")
+                return
+
+            for row in self.db_manager.get_apprets_scellants():
+                nom, prix, _, couverture = row[1], row[2], row[3], row[4]
+                if nom == selected_sealant:
+                    if couverture <= 0:
+                        self.sealant_total_var.set("Erreur")
+                        return
+                    total = (area / couverture) * prix
+                    self.sealant_total_var.set(f"{total:.2f}")
+                    return
+
+            self.sealant_total_var.set("0.00")  # si non trouvé
+        except Exception as e:
+            self.sealant_total_var.set("Erreur")
+
+
+
+    def update_sealant_default(self, *args):
+        """Mettre à jour la sélection d'apprêt en fonction du type de sous-plancher."""
+        subfloor = self.subfloor_var.get()
+        sealant_data = self.db_manager.get_apprets_scellants()
+        sealant_options = [row[1] for row in sealant_data]  # Liste des nom_produit
+        if subfloor == "Béton" and sealant_options:
+            self.sealant_var.set(sealant_options[0])  # Sélectionne le premier apprêt
+        else:
+            self.sealant_var.set("Aucun")  # Réinitialise à "Aucun" pour Bois ou Acier
 
 
     def update_truck_tonnage_options(self, *args):

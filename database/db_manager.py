@@ -33,6 +33,9 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("SELECT id, transporteur, camion, ville, prix_voyage, prix_sable FROM sable")
             return cursor.fetchall()
+            print(f"[DEBUG] Résultats table sable : {results}")
+            return results
+
     
     def add_sable(self, transporteur, camion, ville, prix_voyage, prix_sable):
         with self.get_connection() as conn:
