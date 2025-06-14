@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from .submission_calcs import calculate_distance, calculate_surface_per_mob, get_truck_tonnages, calculate_prix_par_sac, calculate_total_sacs, calculate_prix_total_sacs, calculer_quantite_sable, calculer_nombre_voyages_sable, calculer_prix_total_sable
+from .submission_calcs import calculate_distance, calculate_surface_per_mob, get_truck_tonnages, calculate_prix_par_sac, calculate_total_sacs, calculate_prix_total_sacs, calculer_quantite_sable, calculer_nombre_voyages_sable, calculer_prix_total_sable, calculer_heures_chantier, calculer_heures_transport
 from config import DEFAULT_USD_CAD_RATE, THICKNESS_OPTIONS, SUBFLOOR_OPTIONS, DEFAULT_SUBFLOOR, POSE_MEMBRANE_OPTIONS
 
 
@@ -220,6 +220,20 @@ class SubmissionForm:
         self.nombre_voyages_var.trace("w", lambda *args: self.update_prix_total_sable())
         self.sable_transporter_var.trace("w", self.update_prix_total_sable)
         self.truck_tonnage_var.trace("w", self.update_prix_total_sable)
+        self.champs = {}
+        self.nombre_hommes_var = tk.StringVar(value="6")
+        self.heures_chantier_var = tk.StringVar(value="0")
+        self.area_var.trace("w", self.update_heures_chantier)
+        self.heures_transport_var = tk.StringVar()
+        self.heures_transport_var.set("0")
+        self.distance_var = tk.StringVar()
+        self.distance_var.trace("w", self.update_heures_transport)
+
+        print("[DEBUG] Trace sur distance_var installée")
+
+
+
+
 
 
 
@@ -312,7 +326,6 @@ class SubmissionForm:
 
         # Champ Distance chantier aller-simple (km) et bouton Calculer
         tk.Label(proj_frame, text="Distance chantier aller-simple (km) :").grid(row=2, column=0, padx=5, pady=5, sticky="w")
-        self.distance_var = tk.StringVar()
         tk.Entry(proj_frame, textvariable=self.distance_var, width=10).grid(row=2, column=1, padx=5, pady=5, sticky="w")
         tk.Button(proj_frame, text="Calculer distance", command=lambda: calculate_distance(self.ville_var.get())).grid(row=2, column=2, padx=5, pady=5)
 
@@ -442,10 +455,108 @@ class SubmissionForm:
         tk.Label(prod_frame, textvariable=self.prix_total_sacs_var, relief="solid", width=12, borderwidth=1).grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
 
+        # Nouvelle section Main d’œuvre et machinerie
+        main_frame = ttk.LabelFrame(self.main_frame, text="Main d’œuvre et machinerie", padding=10)
+        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Champ Type de main d’œuvre
+        tk.Label(main_frame, text="Type de main d’œuvre :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+
+        main_doeuvre_data = self.db_manager.get_main_doeuvre()
+        metiers = [row[1] for row in main_doeuvre_data]  # Colonne 1 = metier
+        self.type_main_var = tk.StringVar()
+        if metiers:
+            self.type_main_var.set(metiers[0])
+        else:
+            self.type_main_var.set("")
+
+        self.main_doeuvre_menu = tk.OptionMenu(main_frame, self.type_main_var, *metiers)
+        self.main_doeuvre_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        # Si tu veux une action dynamique quand on sélectionne un métier :
+        # self.type_main_var.trace("w", self.fonction_de_mise_a_jour)
+
+        # Ajouter au dictionnaire des champs
+        self.champs["Type main d’œuvre"] = self.type_main_var
+
+
+        # Champ Type de pension
+        tk.Label(main_frame, text="Type de pension :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        pension_data = self.db_manager.get_pensions()
+        types_pension = [row[1] for row in pension_data]
+        self.type_pension_var = tk.StringVar(value=types_pension[0] if types_pension else "")
+        self.pension_menu = tk.OptionMenu(main_frame, self.type_pension_var, *types_pension)
+        self.pension_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        self.champs["Type de pension"] = self.type_pension_var
+
+
+
+        # Champ Type de machinerie
+        tk.Label(main_frame, text="Type de machinerie :").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+
+        machinerie_data = self.db_manager.get_machinerie()
+        types_machinerie = [row[1] for row in machinerie_data]  # Colonne 1 = type_machinerie
+        self.type_machinerie_var = tk.StringVar()
+        if types_machinerie:
+            self.type_machinerie_var.set(types_machinerie[0])
+        else:
+            self.type_machinerie_var.set("")
+
+        self.type_machinerie_menu = tk.OptionMenu(main_frame, self.type_machinerie_var, *types_machinerie)
+        self.type_machinerie_menu.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        # Ajouter au dictionnaire des champs
+        self.champs["Type machinerie"] = self.type_machinerie_var
+
+
+
+        # Champ Nombre d'hommes
+        tk.Label(main_frame, text="Nombre d'hommes :").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        entry_nombre_hommes = tk.Entry(main_frame, textvariable=self.nombre_hommes_var, justify='center', width=10)
+        entry_nombre_hommes.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+
+        # Ajouter au dictionnaire des champs
+        self.champs["Nombre d'hommes"] = self.nombre_hommes_var
+
+                # Champ Heures chantier calculées
+        tk.Label(main_frame, text="Heures chantier calculées :").grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        self.heures_chantier_var = tk.StringVar(value="0")
+        entry_heures_chantier = tk.Entry(main_frame, textvariable=self.heures_chantier_var, justify='center', width=10)
+        entry_heures_chantier.grid(row=3, column=1, padx=5, pady=5, sticky="w")
+
+        # Ajouter au dictionnaire des champs si besoin
+        self.champs["Heures chantier calculées"] = self.heures_chantier_var
+
+
+        # Champ Heures transport calculées
+        tk.Label(main_frame, text="Heures transport calculées :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        entry_heures_transport = tk.Entry(main_frame, textvariable=self.heures_transport_var, justify='center', width=10)
+        entry_heures_transport.grid(row=4, column=1, padx=5, pady=5, sticky="w")
+        self.champs["Heures transport calculées"] = self.heures_transport_var
+
+
 
         # Boutons
         tk.Button(self.window, text="Enregistrer", command=self.save_submission).pack(pady=10)
         tk.Button(self.window, text="Annuler", command=self.window.destroy).pack(pady=5)
+
+
+
+    def update_heures_transport(self, *args):
+        print("[DEBUG] Appel de update_heures_transport")
+        print(f"[DEBUG] distance_var actuelle : {self.distance_var.get()}")
+        self.heures_transport_var.set(
+            calculer_heures_transport(self.distance_var.get())
+        )
+
+
+
+
+    def update_heures_chantier(self, *args):
+        superficie = self.area_var.get()
+        heures = calculer_heures_chantier(superficie)
+        self.heures_chantier_var.set(heures)
 
 
     def update_nombre_voyages(self, *args): 

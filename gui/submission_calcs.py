@@ -212,3 +212,32 @@ def calculer_prix_total_sable(db_manager, sable_str, voyages_str, transporteur, 
     except Exception as e:
         print(f"[DEBUG] Erreur dans calculer_prix_total_sable : {e}")
         return "Erreur"
+
+import math
+
+def calculer_heures_chantier(superficie_str):
+    try:
+        superficie = float(superficie_str.replace(",", ""))
+        if superficie <= 0:
+            return "0"
+        heures = (superficie / ((453.68 * math.log(superficie) - 2486.6)))+1
+        heures_arrondies = max(4, math.ceil(heures))
+        return str(heures_arrondies)
+    except Exception:
+        return "0"
+
+import math
+
+def calculer_heures_transport(distance_str):
+    try:
+        print(f"[DEBUG] calculer_heures_transport reçu : {distance_str}")
+        distance = float(distance_str.replace(",", ""))
+        if distance <= 0:
+            return "0"
+        heures = math.ceil((distance * 2) / 90)
+        print(f"[DEBUG] Heures transport calculées : {heures}")
+        return str(heures)
+    except Exception as e:
+        print(f"[DEBUG] Erreur dans calculer_heures_transport : {e}")
+        return "0"
+
