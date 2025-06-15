@@ -1,7 +1,13 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from .submission_calcs import calculate_distance, calculate_surface_per_mob, get_truck_tonnages, calculate_prix_par_sac, calculate_total_sacs, calculate_prix_total_sacs, calculer_quantite_sable, calculer_nombre_voyages_sable, calculer_prix_total_sable, calculer_heures_chantier, calculer_heures_transport
+from .submission_calcs import (calculate_distance, calculate_surface_per_mob, get_truck_tonnages, calculate_prix_par_sac, 
+                               calculate_total_sacs, calculate_prix_total_sacs, calculer_quantite_sable, calculer_nombre_voyages_sable, 
+                               calculer_prix_total_sable, calculer_heures_chantier, calculer_heures_transport, calculer_prix_total_machinerie, 
+                               calculer_prix_total_pension
+)
+
+
 from config import DEFAULT_USD_CAD_RATE, THICKNESS_OPTIONS, SUBFLOOR_OPTIONS, DEFAULT_SUBFLOOR, POSE_MEMBRANE_OPTIONS
 
 
@@ -223,11 +229,22 @@ class SubmissionForm:
         self.champs = {}
         self.nombre_hommes_var = tk.StringVar(value="6")
         self.heures_chantier_var = tk.StringVar(value="0")
-        self.area_var.trace("w", self.update_heures_chantier)
-        self.heures_transport_var = tk.StringVar()
+        self.heures_transport_var = tk.StringVar(value="0")
         self.heures_transport_var.set("0")
         self.distance_var = tk.StringVar()
         self.distance_var.trace("w", self.update_heures_transport)
+        self.area_var.trace("w", self.update_heures_chantier)
+        self.prix_total_machinerie_var = tk.StringVar(value="0.00")
+        self.heures_chantier_var.trace("w", self.update_prix_total_machinerie)
+        self.prix_total_pension_var = tk.StringVar(value="0.00")
+        self.nombre_hommes_var.trace("w", self.update_prix_total_pension)
+
+        
+
+
+
+
+
 
         print("[DEBUG] Trace sur distance_var installée")
 
@@ -482,12 +499,18 @@ class SubmissionForm:
 
         # Champ Type de pension
         tk.Label(main_frame, text="Type de pension :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+
         pension_data = self.db_manager.get_pensions()
         types_pension = [row[1] for row in pension_data]
+
         self.type_pension_var = tk.StringVar(value=types_pension[0] if types_pension else "")
+        self.type_pension_var.trace("w", self.update_prix_total_pension)
+        self.update_prix_total_pension()
+       
         self.pension_menu = tk.OptionMenu(main_frame, self.type_pension_var, *types_pension)
         self.pension_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
         self.champs["Type de pension"] = self.type_pension_var
+
 
 
 
@@ -502,11 +525,23 @@ class SubmissionForm:
         else:
             self.type_machinerie_var.set("")
 
+        self.prix_total_machinerie_var = tk.StringVar(value="0.00")
+
+        self.type_machinerie_var.trace("w", self.update_prix_total_machinerie)
+        self.heures_transport_var.trace("w", self.update_prix_total_machinerie)
+
+
         self.type_machinerie_menu = tk.OptionMenu(main_frame, self.type_machinerie_var, *types_machinerie)
         self.type_machinerie_menu.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
         # Ajouter au dictionnaire des champs
         self.champs["Type machinerie"] = self.type_machinerie_var
+
+        # Champ Prix total machinerie
+        tk.Label(main_frame, text="Prix total machinerie ($) :").grid(row=1, column=2, padx=5, pady=5, sticky="e")
+        self.prix_total_machinerie_var = tk.StringVar(value="0.00")
+        tk.Label(main_frame, textvariable=self.prix_total_machinerie_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=1, column=3, padx=5, pady=5, sticky="w")
+
 
 
 
@@ -516,12 +551,19 @@ class SubmissionForm:
         entry_nombre_hommes.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
 
+        # Champ Prix total pension
+
+
+        tk.Label(main_frame, text="Prix total pension ($) :").grid(row=2, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, textvariable=self.prix_total_pension_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=2, column=3, padx=5, pady=5, sticky="w")
+
+
+
         # Ajouter au dictionnaire des champs
         self.champs["Nombre d'hommes"] = self.nombre_hommes_var
 
                 # Champ Heures chantier calculées
         tk.Label(main_frame, text="Heures chantier calculées :").grid(row=3, column=0, padx=5, pady=5, sticky="e")
-        self.heures_chantier_var = tk.StringVar(value="0")
         entry_heures_chantier = tk.Entry(main_frame, textvariable=self.heures_chantier_var, justify='center', width=10)
         entry_heures_chantier.grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
@@ -542,6 +584,36 @@ class SubmissionForm:
         tk.Button(self.window, text="Annuler", command=self.window.destroy).pack(pady=5)
 
 
+    def update_prix_total_pension(self, *args):
+        try:
+            print("[DEBUG] → Appel update_prix_total_pension")
+            type_pension = self.type_pension_var.get()
+            nombre_hommes = self.nombre_hommes_var.get()
+            print(f"[DEBUG] type_pension={type_pension}, nombre_hommes={nombre_hommes}")
+
+            total = calculer_prix_total_pension(self.db_manager, type_pension, nombre_hommes)
+            print(f"[DEBUG] total calculé : {total}")
+            self.prix_total_pension_var.set(total)
+
+        except Exception as e:
+            print(f"[ERREUR] update_prix_total_pension : {e}")
+            self.prix_total_pension_var.set("Erreur")
+
+
+
+
+    def update_prix_total_machinerie(self, *args):
+        try:
+            type_machinerie = self.type_machinerie_var.get()
+            heures_chantier = self.heures_chantier_var.get()
+            heures_transport = self.heures_transport_var.get()
+            total = calculer_prix_total_machinerie(self.db_manager, type_machinerie, heures_chantier, heures_transport)
+            self.prix_total_machinerie_var.set(total)
+        except Exception as e:
+            print(f"[ERREUR] update_prix_total_machinerie : {e}")
+            self.prix_total_machinerie_var.set("Erreur")
+
+
 
     def update_heures_transport(self, *args):
         print("[DEBUG] Appel de update_heures_transport")
@@ -557,6 +629,7 @@ class SubmissionForm:
         superficie = self.area_var.get()
         heures = calculer_heures_chantier(superficie)
         self.heures_chantier_var.set(heures)
+        self.update_prix_total_machinerie()
 
 
     def update_nombre_voyages(self, *args): 

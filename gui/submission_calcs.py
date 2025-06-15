@@ -241,3 +241,65 @@ def calculer_heures_transport(distance_str):
         print(f"[DEBUG] Erreur dans calculer_heures_transport : {e}")
         return "0"
 
+
+def calculer_prix_total_machinerie(db_manager, type_machinerie, heures_chantier, heures_transport):
+    try:
+        print("[DEBUG] type_machinerie =", type_machinerie)
+        print("[DEBUG] heures_chantier brut =", heures_chantier)
+        print("[DEBUG] heures_transport brut =", heures_transport)
+
+        machinerie_data = db_manager.get_machinerie()
+        taux_horaire = next((float(row[2]) for row in machinerie_data if row[1] == type_machinerie), None)
+
+        print("[DEBUG] taux_horaire =", taux_horaire)
+
+        if taux_horaire is None:
+            return "0.00"
+
+        heures_chantier = float(heures_chantier.replace(",", ".") or 0)
+        heures_transport = float(heures_transport.replace(",", ".") or 0)
+        heures_total = heures_chantier + heures_transport
+
+        print("[DEBUG] heures_total =", heures_total)
+
+        total = taux_horaire * heures_total
+        print("[DEBUG] total =", total)
+
+        return f"{total:.2f}"
+
+    except Exception as e:
+        print(f"[ERREUR] calculer_prix_total_machinerie : {e}")
+        return "Erreur"
+
+def calculer_prix_total_pension(db_manager, type_pension, nombre_hommes):
+    try:
+        print("[DEBUG] Type de pension reçu :", type_pension)
+        print("[DEBUG] Nombre d'hommes reçu :", nombre_hommes)
+
+        if not type_pension or not nombre_hommes:
+            print("[DEBUG] Valeurs manquantes")
+            return "0.00"
+
+        pensions = db_manager.get_pensions()
+        print("[DEBUG] Pensions trouvées :", pensions)
+
+        montant_journalier = next(
+            (float(row[2]) for row in pensions if row[1] == type_pension), None
+        )
+        print("[DEBUG] Montant par jour trouvé :", montant_journalier)
+
+        if montant_journalier is None:
+            print("[DEBUG] Aucune correspondance pour le type de pension")
+            return "0.00"
+
+        nombre = int(nombre_hommes)
+        total = nombre * montant_journalier
+        print("[DEBUG] Total calculé :", total)
+        return f"{total:.2f}"
+
+    except Exception as e:
+        print(f"[ERREUR] calculer_prix_total_pension : {e}")
+        return "Erreur"
+
+
+
