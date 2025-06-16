@@ -238,6 +238,32 @@ class SubmissionForm:
         self.heures_chantier_var.trace("w", self.update_prix_total_machinerie)
         self.prix_total_pension_var = tk.StringVar(value="0.00")
         self.nombre_hommes_var.trace("w", self.update_prix_total_pension)
+        self.prix_total_heures_chantier_var = tk.StringVar(value="0.00")
+        self.nombre_hommes_var.trace("w", self.update_prix_total_heures_chantier)
+        self.heures_chantier_var.trace("w", self.update_prix_total_heures_chantier)
+        self.prix_total_heures_transport_var = tk.StringVar(value="0.00")
+        self.nombre_hommes_var.trace("w", self.update_prix_total_heures_transport)
+        self.heures_transport_var.trace("w", self.update_prix_total_heures_transport)
+        self.ajustement1_var = tk.StringVar(value="0.00")
+        self.ajustement2_var = tk.StringVar(value="0.00")
+        self.ajustement3_var = tk.StringVar(value="0.00")
+        self.reperes_var = tk.StringVar(value="0.00")
+        self.sous_total_ajustements_var = tk.StringVar(value="0.00")
+        self.ajustement1_var.trace("w", self.update_sous_total_ajustements)
+        self.ajustement2_var.trace("w", self.update_sous_total_ajustements)
+        self.ajustement3_var.trace("w", self.update_sous_total_ajustements)
+        self.reperes_var.trace("w", self.update_sous_total_ajustements)
+        self.sous_total_fournisseurs_var = tk.StringVar(value="0.00")
+        self.sous_total_main_machinerie_var = tk.StringVar(value="0.00 $")
+        self.total_prix_coutants_var = tk.StringVar(value="0.00 $")
+
+
+
+
+
+
+        
+
 
         
 
@@ -296,7 +322,7 @@ class SubmissionForm:
 
 
         # Frame Informations Générales
-        gen_frame = ttk.LabelFrame(self.main_frame, text="Informations Générales", padding=10)
+        gen_frame = ttk.LabelFrame(self.main_frame, text="INFORMATIONS GENERALES", padding=10)
         gen_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Client (pré-rempli et non modifiable)
@@ -327,7 +353,7 @@ class SubmissionForm:
         tk.Entry(gen_frame, textvariable=self.submission_number_var, state="disabled", width=30).grid(row=3, column=1, padx=5, pady=5)
 
         # Frame Détails du Projet
-        proj_frame = ttk.LabelFrame(self.main_frame, text="Détails du Projet", padding=10)
+        proj_frame = ttk.LabelFrame(self.main_frame, text="DETAILS DU PROJET", padding=10)
         proj_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Projet (2 lignes) et bouton Notes de projet
@@ -361,7 +387,7 @@ class SubmissionForm:
         self.mobilizations_var.trace("w", self.update_surface_per_mob)
 
         # Frame Paramètres de calcul
-        calc_frame = ttk.LabelFrame(self.main_frame, text="Paramètres de Calcul", padding=10)
+        calc_frame = ttk.LabelFrame(self.main_frame, text="PARAMETRES DE CALCUL", padding=10)
         calc_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Superficie (pi²)
@@ -438,7 +464,7 @@ class SubmissionForm:
         self.thaw_work_check.grid(row=4, column=1, padx=5, pady=5, sticky="w")
 
         # Nouvelle section Produits et Fournisseurs
-        prod_frame = ttk.LabelFrame(self.main_frame, text="Produits et Fournisseurs", padding=10)
+        prod_frame = ttk.LabelFrame(self.main_frame, text="PRODUITS ET FOURNISSEURS", padding=10)
         prod_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Apprets et scellants
@@ -473,7 +499,7 @@ class SubmissionForm:
 
 
         # Nouvelle section Main d’œuvre et machinerie
-        main_frame = ttk.LabelFrame(self.main_frame, text="Main d’œuvre et machinerie", padding=10)
+        main_frame = ttk.LabelFrame(self.main_frame, text="MAIN D'OEUVRE ET MACHINERIE", padding=10)
         main_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
         # Champ Type de main d’œuvre
@@ -487,14 +513,18 @@ class SubmissionForm:
         else:
             self.type_main_var.set("")
 
+        
+
         self.main_doeuvre_menu = tk.OptionMenu(main_frame, self.type_main_var, *metiers)
         self.main_doeuvre_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
-        # Si tu veux une action dynamique quand on sélectionne un métier :
-        # self.type_main_var.trace("w", self.fonction_de_mise_a_jour)
 
-        # Ajouter au dictionnaire des champs
-        self.champs["Type main d’œuvre"] = self.type_main_var
+        # Déclenche le calcul du prix total heures chantier si le métier change
+        self.type_main_var.trace("w", self.update_prix_total_heures_chantier)
+        self.type_main_var.trace("w", self.update_prix_total_heures_transport)
+        # Ajouter au dictionnaire des champs avec la bonne orthographe
+        self.champs["Type de main d'oeuvre"] = self.type_main_var
+
 
 
         # Champ Type de pension
@@ -562,7 +592,7 @@ class SubmissionForm:
         # Ajouter au dictionnaire des champs
         self.champs["Nombre d'hommes"] = self.nombre_hommes_var
 
-                # Champ Heures chantier calculées
+        # Champ Heures chantier calculées
         tk.Label(main_frame, text="Heures chantier calculées :").grid(row=3, column=0, padx=5, pady=5, sticky="e")
         entry_heures_chantier = tk.Entry(main_frame, textvariable=self.heures_chantier_var, justify='center', width=10)
         entry_heures_chantier.grid(row=3, column=1, padx=5, pady=5, sticky="w")
@@ -571,11 +601,85 @@ class SubmissionForm:
         self.champs["Heures chantier calculées"] = self.heures_chantier_var
 
 
+        #Champ Prix total heures chantier
+        tk.Label(main_frame, text="Prix total heures chantier ($) :").grid(row=3, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, textvariable=self.prix_total_heures_chantier_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=3, column=3, padx=5, pady=5, sticky="w")
+
+
+
         # Champ Heures transport calculées
         tk.Label(main_frame, text="Heures transport calculées :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
         entry_heures_transport = tk.Entry(main_frame, textvariable=self.heures_transport_var, justify='center', width=10)
         entry_heures_transport.grid(row=4, column=1, padx=5, pady=5, sticky="w")
         self.champs["Heures transport calculées"] = self.heures_transport_var
+
+        # Champ Prix total heures transport
+        tk.Label(main_frame, text="Prix total heures transport ($) :").grid(row=4, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, textvariable=self.prix_total_heures_transport_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=3, padx=5, pady=5, sticky="w")
+
+
+
+        # Nouvelle section AJUSTEMENTS ET TOTAUX
+        ajustements_frame = ttk.LabelFrame(self.main_frame, text="AJUSTEMENTS ET TOTAUX", padding=10)
+        ajustements_frame.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Champs Ajustement 1
+        ajust_label1 = tk.Entry(ajustements_frame, width=20)
+        ajust_label1.insert(0, "Ajustement 1")
+        ajust_label1.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ajust_value1 = tk.Entry(ajustements_frame, textvariable=self.ajustement1_var, width=12, justify='right')
+        ajust_value1.grid(row=0, column=1, padx=5, pady=5)
+
+        # Champs Ajustement 2
+        ajust_label2 = tk.Entry(ajustements_frame, width=20)
+        ajust_label2.insert(0, "Ajustement 2")
+        ajust_label2.grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        ajust_value2 = tk.Entry(ajustements_frame, textvariable=self.ajustement2_var, width=12, justify='right')
+        ajust_value2.grid(row=1, column=1, padx=5, pady=5)
+
+        # Champs Ajustement 3
+        ajust_label3 = tk.Entry(ajustements_frame, width=20)
+        ajust_label3.insert(0, "Ajustement 3")
+        ajust_label3.grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        ajust_value3 = tk.Entry(ajustements_frame, textvariable=self.ajustement3_var, width=12, justify='right')
+        ajust_value3.grid(row=2, column=1, padx=5, pady=5)
+
+
+
+        # Repères de nivellement
+        tk.Label(ajustements_frame, text="Repères de nivellement :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        entry_reperes = tk.Entry(ajustements_frame, textvariable=self.reperes_var, width=12, justify='right')
+        entry_reperes.grid(row=4, column=1, padx=5, pady=5, sticky="w")
+
+        # Sous-total ajustements (non modifiable)
+        tk.Label(ajustements_frame, text="SOUS-TOTAL AJUSTEMENTS ($) :").grid(row=5, column=0, padx=5, pady=10, sticky="e")
+        tk.Label(
+            ajustements_frame,
+            textvariable=self.sous_total_ajustements_var,
+            width=12,
+            relief="solid",
+            borderwidth=1,
+            anchor="center",
+            font=("Helvetica", 10, "bold")
+        ).grid(row=5, column=1, padx=5, pady=10, sticky="w")
+
+
+
+        # SOUS-TOTAL PRODUITS ET FOURNISSEURS
+        tk.Label(ajustements_frame, text="SOUS-TOTAL PRODUITS ET FOURNISSEURS ($) :").grid(row=6, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, textvariable=self.sous_total_fournisseurs_var, width=12, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=6, column=1, padx=5, pady=5, sticky="w")
+
+
+        # SOUS-TOTAL MAIN D’OEUVRE ET MACHINERIE
+        tk.Label(ajustements_frame, text="SOUS-TOTAL MAIN D’OEUVRE ET MACHINERIE").grid(row=7, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, textvariable=self.sous_total_main_machinerie_var, font=("Helvetica", 10, "bold"),
+                width=12, relief="solid", borderwidth=1, anchor="center").grid(row=7, column=1, padx=5, pady=5, sticky="w")
+
+
+        # TOTAL DES PRIX COÛTANTS
+        tk.Label(ajustements_frame, text="TOTAL DES PRIX COÛTANTS").grid(row=8, column=0, padx=5, pady=10, sticky="e")
+        tk.Label(ajustements_frame, textvariable=self.total_prix_coutants_var, font=("Helvetica", 10, "bold"),
+                width=12, relief="solid", borderwidth=1, anchor="center").grid(row=8, column=1, padx=5, pady=10, sticky="w")
 
 
 
@@ -584,20 +688,155 @@ class SubmissionForm:
         tk.Button(self.window, text="Annuler", command=self.window.destroy).pack(pady=5)
 
 
-    def update_prix_total_pension(self, *args):
+    def update_total_prix_coutants(self, *args):
         try:
-            print("[DEBUG] → Appel update_prix_total_pension")
-            type_pension = self.type_pension_var.get()
-            nombre_hommes = self.nombre_hommes_var.get()
-            print(f"[DEBUG] type_pension={type_pension}, nombre_hommes={nombre_hommes}")
+            def get_float(var):
+                val = var.get().replace(" $", "").replace(",", ".")
+                return float(val) if val.strip() else 0.0
 
-            total = calculer_prix_total_pension(self.db_manager, type_pension, nombre_hommes)
-            print(f"[DEBUG] total calculé : {total}")
-            self.prix_total_pension_var.set(total)
+            total_ajustements = get_float(self.sous_total_ajustements_var)
+            total_fournisseurs = get_float(self.sous_total_fournisseurs_var)
+            total_main_machinerie = get_float(self.sous_total_main_machinerie_var)
+
+            total = total_ajustements + total_fournisseurs + total_main_machinerie
+            self.total_prix_coutants_var.set(f"{total:.2f} $")
 
         except Exception as e:
-            print(f"[ERREUR] update_prix_total_pension : {e}")
+            print(f"[ERREUR] update_total_prix_coutants : {e}")
+            self.total_prix_coutants_var.set("Erreur")
+
+
+    def update_sous_total_main_machinerie(self, *args):
+        try:
+            def get_float(var):
+                val = var.get().replace(" $", "").replace(",", ".")
+                return float(val) if val.strip() else 0.0
+
+            total_machinerie = get_float(self.prix_total_machinerie_var)
+            total_pension = get_float(self.prix_total_pension_var)
+            total_chantier = get_float(self.prix_total_heures_chantier_var)
+            total_transport = get_float(self.prix_total_heures_transport_var)
+
+            total = total_machinerie + total_pension + total_chantier + total_transport
+            self.sous_total_main_machinerie_var.set(f"{total:.2f} $")
+
+        except Exception as e:
+            print(f"[ERREUR] update_sous_total_main_machinerie : {e}")
+            self.sous_total_main_machinerie_var.set("Erreur")
+
+        self.update_total_prix_coutants()
+
+
+    def update_sous_total_fournisseurs(self, *args):
+        try:
+            sealant_total = float(self.sealant_total_var.get().replace(",", ".") or 0)
+            total_sacs = float(self.prix_total_sacs_var.get().replace(",", ".") or 0)
+            total_sable = float(self.prix_total_sable_var.get().replace(",", ".") or 0)
+
+            total = sealant_total + total_sacs + total_sable
+            self.sous_total_fournisseurs_var.set(f"{total:.2f} $")
+        except Exception as e:
+            print(f"[ERREUR] update_sous_total_fournisseurs : {e}")
+            self.sous_total_fournisseurs_var.set("Erreur")
+
+        self.update_total_prix_coutants()
+
+
+
+
+    def update_sous_total_ajustements(self, *args):
+        try:
+            montants = [
+                float(self.ajustement1_var.get() or 0),
+                float(self.ajustement2_var.get() or 0),
+                float(self.ajustement3_var.get() or 0),
+                float(self.reperes_var.get() or 0)
+            ]
+            total = sum(montants)
+            self.sous_total_ajustements_var.set(f"{total:.2f} $")
+        except Exception as e:
+            print(f"[ERREUR] update_sous_total_ajustements : {e}")
+            self.sous_total_ajustements_var.set("Erreur")
+
+        self.update_total_prix_coutants()
+
+
+
+    def update_prix_total_heures_transport(self, *args):
+        try:
+            nb_hommes = int(self.nombre_hommes_var.get())
+            heures_transport = float(self.heures_transport_var.get())
+            type_main = self.type_main_var.get()
+
+            main_data = self.db_manager.get_main_doeuvre()
+            taux = next((row[3] for row in main_data if row[1] == type_main), None)
+
+            if taux is not None:
+                total = nb_hommes * heures_transport * taux
+                self.prix_total_heures_transport_var.set(f"{total:.2f} $")
+            else:
+                self.prix_total_heures_transport_var.set("0.00")
+        except Exception as e:
+            self.prix_total_heures_transport_var.set("0.00")
+        
+        self.update_sous_total_main_machinerie()
+
+
+
+
+
+    def update_prix_total_heures_chantier(self, *args):
+        
+        try:
+            type_main = self.champs.get("Type de main d'oeuvre", tk.StringVar()).get()
+            heures_chantier_str = self.heures_chantier_var.get()
+            nb_hommes_str = self.nombre_hommes_var.get()
+
+            if not type_main or not heures_chantier_str or not nb_hommes_str:
+                self.prix_total_heures_chantier_var.set("0.00")
+                return
+
+            heures_chantier = float(heures_chantier_str)
+            nb_hommes = int(nb_hommes_str)
+
+            for mo in self.db_manager.get_main_doeuvre():
+                if mo[1] == type_main:
+                    taux_horaire = mo[2]
+                    total = nb_hommes * heures_chantier * taux_horaire
+                    self.prix_total_heures_chantier_var.set(f"{total:.2f} $")
+                    return
+
+            
+
+        except Exception as e:
+            self.prix_total_heures_chantier_var.set("0.00")
+
+        self.update_sous_total_main_machinerie()
+
+
+
+
+
+    def update_prix_total_pension(self, *args):
+        try:
+            type_pension = self.type_pension_var.get()
+            nombre_hommes = self.nombre_hommes_var.get()
+            
+
+            total = calculer_prix_total_pension(self.db_manager, type_pension, nombre_hommes)
+
+            if total is None:
+                raise ValueError("Résultat du calcul est None")
+
+            total_float = float(total)
+            self.prix_total_pension_var.set(f"{total_float:.2f} $")
+            
+
+        except Exception as e:
             self.prix_total_pension_var.set("Erreur")
+
+        self.update_sous_total_main_machinerie()
+
 
 
 
@@ -607,17 +846,27 @@ class SubmissionForm:
             type_machinerie = self.type_machinerie_var.get()
             heures_chantier = self.heures_chantier_var.get()
             heures_transport = self.heures_transport_var.get()
+
             total = calculer_prix_total_machinerie(self.db_manager, type_machinerie, heures_chantier, heures_transport)
-            self.prix_total_machinerie_var.set(total)
+
+            if total is None:
+                raise ValueError("Résultat du calcul est None")
+
+            total_float = float(total)
+            self.prix_total_machinerie_var.set(f"{total_float:.2f} $")
+            
+
         except Exception as e:
-            print(f"[ERREUR] update_prix_total_machinerie : {e}")
             self.prix_total_machinerie_var.set("Erreur")
+
+        self.update_sous_total_main_machinerie()
+
+
 
 
 
     def update_heures_transport(self, *args):
-        print("[DEBUG] Appel de update_heures_transport")
-        print(f"[DEBUG] distance_var actuelle : {self.distance_var.get()}")
+        
         self.heures_transport_var.set(
             calculer_heures_transport(self.distance_var.get())
         )
@@ -630,6 +879,7 @@ class SubmissionForm:
         heures = calculer_heures_chantier(superficie)
         self.heures_chantier_var.set(heures)
         self.update_prix_total_machinerie()
+        self.update_prix_total_heures_chantier()
 
 
     def update_nombre_voyages(self, *args): 
@@ -637,18 +887,14 @@ class SubmissionForm:
             sable_str = self.sable_total_var.get()
             tonnage_str = self.truck_tonnage_var.get()
 
-            print(f"[DEBUG] Valeurs récupérées : sable = {sable_str}, tonnage camion = {tonnage_str}")
-
             # Vérifier si les champs sont vides
             if not sable_str or not tonnage_str:
                 self.nombre_voyages_var.set("0")
                 return
 
-            voyages = calculer_nombre_voyages_sable(sable_str, tonnage_str)
-            print(f"[DEBUG] Résultat voyages : {voyages}")
+            voyages = calculer_nombre_voyages_sable(sable_str, tonnage_str)            
             self.nombre_voyages_var.set(voyages)
         except Exception as e:
-            print(f"[DEBUG] Erreur dans update_nombre_voyages : {e}")
             self.nombre_voyages_var.set("Erreur")
         
         self.update_prix_total_sable()
@@ -665,10 +911,12 @@ class SubmissionForm:
 
             total = calculer_prix_total_sable(self.db_manager, sable_str, voyages_str, transporteur, type_camion)
             self.prix_total_sable_var.set(total)
-            print(f"[DEBUG] Prix total sable affiché : {total}")
+            
         except Exception as e:
-            print(f"[DEBUG] Erreur dans update_prix_total_sable : {e}")
+            
             self.prix_total_sable_var.set("Erreur")
+
+        self.update_sous_total_fournisseurs()
 
 
 
@@ -689,17 +937,19 @@ class SubmissionForm:
             nb_sacs_str = self.total_sacs_var.get()
             prix_unitaire_str = self.prix_par_sac_var.get()
 
-            print(f"[DEBUG] Valeur récupérée : total_sacs_var = '{nb_sacs_str}', prix_par_sac_var = '{prix_unitaire_str}'")
+            
 
             nb_sacs = int(nb_sacs_str)
             prix_unitaire = float(prix_unitaire_str.replace(",", "."))
 
             total = nb_sacs * prix_unitaire
-            print(f"[DEBUG] Total sacs = {nb_sacs}, Prix unitaire = {prix_unitaire}, Total = {total}")
+            
             self.prix_total_sacs_var.set(f"{total:.2f}")
         except Exception as e:
-            print(f"[DEBUG] Erreur dans update_prix_total_sacs : {e}")
+            
             self.prix_total_sacs_var.set("0.00")
+
+        self.update_sous_total_fournisseurs()
 
     
 
@@ -714,7 +964,7 @@ class SubmissionForm:
         ratio = self.ratio_var.get()
 
         result = calculate_total_sacs(superficie, epaisseur, produit, ratio, self.db_manager)
-        print(f"[DEBUG] Résultat total sacs : {result}")
+        
         self.total_sacs_var.set(result)
 
         # ✅ Forcer le recalcul du prix total
@@ -756,6 +1006,8 @@ class SubmissionForm:
             self.sealant_total_var.set("0.00")  # si non trouvé
         except Exception as e:
             self.sealant_total_var.set("Erreur")
+
+        self.update_sous_total_fournisseurs()
 
 
 

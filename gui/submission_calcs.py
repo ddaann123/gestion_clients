@@ -56,7 +56,7 @@ def calculate_prix_par_sac(product_name, usd_cad_rate, db_manager):
 
 def calculate_total_sacs(superficie, epaisseur_pouces, produit_nom, ratio_str, db_manager):
     try:
-        print(f"[DEBUG] Appel calculate_total_sacs avec : superficie={superficie}, epaisseur='{epaisseur_pouces}', produit='{produit_nom}', ratio='{ratio_str}'")
+        
 
         superficie = float(superficie)
         epaisseur_str = epaisseur_pouces.replace('"', '').replace(',', '.').strip()
@@ -74,29 +74,29 @@ def calculate_total_sacs(superficie, epaisseur_pouces, produit_nom, ratio_str, d
             except:
                 epaisseur = float(Fraction(epaisseur_str))
 
-        print(f"[DEBUG] Épaisseur convertie : {epaisseur}")
+        
 
         produits = db_manager.get_produit_details()
         produit = next((p for p in produits if p[0] == produit_nom), None)
         if not produit:
-            print("[DEBUG] Produit non trouvé")
+            
             return "0"
 
         type_produit = produit[5]
         couverture_1_pouce = produit[6]
-        print(f"[DEBUG] Type de produit : {type_produit}, Couverture 1'' : {couverture_1_pouce}")
+        
 
         if type_produit == "COUVERTURE":
             if not couverture_1_pouce or couverture_1_pouce <= 0:
-                print(f"[DEBUG] Couverture invalide : {couverture_1_pouce}")
+                
                 return "Erreur"
             sacs = math.ceil(superficie * (epaisseur / 1.0) / couverture_1_pouce)
-            print(f"[DEBUG] Nombre de sacs (COUVERTURE) : {sacs}")
+            
             return str(sacs)
 
         else:  # RATIO
             if not ratio_str:
-                print("[DEBUG] Ratio vide pour produit RATIO")
+                
                 return "Erreur"
 
             try:
@@ -106,22 +106,22 @@ def calculate_total_sacs(superficie, epaisseur_pouces, produit_nom, ratio_str, d
                 else:
                     ratio_num = float(ratio_str)
                 if ratio_num <= 0:
-                    print(f"[DEBUG] Ratio négatif ou nul : {ratio_num}")
+                    
                     return "Erreur"
             except Exception as e:
-                print(f"[DEBUG] Erreur de conversion du ratio : {e}")
+                
                 return "Erreur"
 
             couverture = (ratio_num + 0.54) / (epaisseur / 12)
             if couverture <= 0:
-                print(f"[DEBUG] Couverture calculée invalide : {couverture}")
+                
                 return "Erreur"
             sacs = math.ceil(superficie / couverture)
-            print(f"[DEBUG] Nombre de sacs (RATIO) : {sacs}")
+            
             return str(sacs)
 
     except Exception as e:
-        print(f"[DEBUG] Exception générale : {e}")
+        
         return "Erreur"
 
 
@@ -132,7 +132,7 @@ def calculate_prix_total_sacs(prix_par_sac, nb_sacs):
         total = prix * sacs
         return f"{total:.2f}"
     except Exception as e:
-        print(f"[DEBUG] Erreur calcul prix total sacs : {e}")
+        
         return "Erreur"
 
 
@@ -140,12 +140,12 @@ def calculate_prix_total_sacs(prix_par_sac, nb_sacs):
 def calculer_quantite_sable(nb_sacs_str, ratio_str):
     try:
         if not nb_sacs_str or not ratio_str:
-            print("[DEBUG] Champs incomplets, retour 0")
+            
             return "0"
 
         nb_sacs = int(nb_sacs_str)
         if nb_sacs <= 0:
-            print("[DEBUG] Nombre de sacs <= 0")
+            
             return "0"
 
         if ":" in ratio_str:
@@ -155,15 +155,15 @@ def calculer_quantite_sable(nb_sacs_str, ratio_str):
             ratio = float(ratio_str)
 
         if ratio <= 0:
-            print("[DEBUG] Ratio <= 0")
+            
             return "0"
 
         sable_tm = math.ceil(nb_sacs * ratio * 0.04994)
-        print(f"[DEBUG] Sacs: {nb_sacs}, Ratio: {ratio}, Sable total (tm): {sable_tm}")
+        
         return str(sable_tm)
 
     except Exception as e:
-        print(f"[DEBUG] Erreur calcul sable: {e}")
+        
         return "0"
 
 
@@ -176,15 +176,15 @@ def calculer_nombre_voyages_sable(sable_tm_str, tonnage_camion_str):
             raise ValueError("Tonnage camion invalide")
 
         voyages = math.ceil(sable_tm / tonnage_camion)
-        print(f"[DEBUG] Sable: {sable_tm} tm, Tonnage camion: {tonnage_camion}, Voyages: {voyages}")
+        
         return str(voyages)
     except Exception as e:
-        print(f"[DEBUG] Erreur calcul voyages sable: {e}")
+        
         return ""
 
 def calculer_prix_total_sable(db_manager, sable_str, voyages_str, transporteur, type_camion):
 
-    print(f"[DEBUG] Requête pour transporteur: {transporteur}")
+    
 
     try:
         if not sable_str or not voyages_str or not transporteur or not type_camion:
@@ -199,18 +199,18 @@ def calculer_prix_total_sable(db_manager, sable_str, voyages_str, transporteur, 
         prix_sable = 0
 
         for row in sable_data:
-            print(f"[DEBUG] Vérification ligne: {row}")
+            
             if row[1] == transporteur and row[2] == int(type_camion):
                 prix_voyage = float(row[4])  # Prix par voyage
                 prix_sable = float(row[5])   # Prix par tonne
                 break
 
         total = voyages * prix_voyage + sable * prix_sable
-        print(f"[DEBUG] Sable: {sable}, Voyages: {voyages}, Prix voyage: {prix_voyage}, Prix sable: {prix_sable}, Total: {total}")
+        
         return f"{total:.2f}"
 
     except Exception as e:
-        print(f"[DEBUG] Erreur dans calculer_prix_total_sable : {e}")
+        
         return "Erreur"
 
 import math
@@ -230,28 +230,26 @@ import math
 
 def calculer_heures_transport(distance_str):
     try:
-        print(f"[DEBUG] calculer_heures_transport reçu : {distance_str}")
+        
         distance = float(distance_str.replace(",", ""))
         if distance <= 0:
             return "0"
         heures = math.ceil((distance * 2) / 90)
-        print(f"[DEBUG] Heures transport calculées : {heures}")
+        
         return str(heures)
     except Exception as e:
-        print(f"[DEBUG] Erreur dans calculer_heures_transport : {e}")
+        
         return "0"
 
 
 def calculer_prix_total_machinerie(db_manager, type_machinerie, heures_chantier, heures_transport):
     try:
-        print("[DEBUG] type_machinerie =", type_machinerie)
-        print("[DEBUG] heures_chantier brut =", heures_chantier)
-        print("[DEBUG] heures_transport brut =", heures_transport)
+
 
         machinerie_data = db_manager.get_machinerie()
         taux_horaire = next((float(row[2]) for row in machinerie_data if row[1] == type_machinerie), None)
 
-        print("[DEBUG] taux_horaire =", taux_horaire)
+        
 
         if taux_horaire is None:
             return "0.00"
@@ -260,10 +258,10 @@ def calculer_prix_total_machinerie(db_manager, type_machinerie, heures_chantier,
         heures_transport = float(heures_transport.replace(",", ".") or 0)
         heures_total = heures_chantier + heures_transport
 
-        print("[DEBUG] heures_total =", heures_total)
+        
 
         total = taux_horaire * heures_total
-        print("[DEBUG] total =", total)
+        
 
         return f"{total:.2f}"
 
@@ -273,32 +271,31 @@ def calculer_prix_total_machinerie(db_manager, type_machinerie, heures_chantier,
 
 def calculer_prix_total_pension(db_manager, type_pension, nombre_hommes):
     try:
-        print("[DEBUG] Type de pension reçu :", type_pension)
-        print("[DEBUG] Nombre d'hommes reçu :", nombre_hommes)
+
 
         if not type_pension or not nombre_hommes:
-            print("[DEBUG] Valeurs manquantes")
+            
             return "0.00"
 
         pensions = db_manager.get_pensions()
-        print("[DEBUG] Pensions trouvées :", pensions)
+        
 
         montant_journalier = next(
             (float(row[2]) for row in pensions if row[1] == type_pension), None
         )
-        print("[DEBUG] Montant par jour trouvé :", montant_journalier)
+        
 
         if montant_journalier is None:
-            print("[DEBUG] Aucune correspondance pour le type de pension")
+            
             return "0.00"
 
         nombre = int(nombre_hommes)
         total = nombre * montant_journalier
-        print("[DEBUG] Total calculé :", total)
+        
         return f"{total:.2f}"
 
     except Exception as e:
-        print(f"[ERREUR] calculer_prix_total_pension : {e}")
+        
         return "Erreur"
 
 
