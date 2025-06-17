@@ -300,3 +300,13 @@ def calculer_prix_total_pension(db_manager, type_pension, nombre_hommes):
 
 
 
+def valider_entree_numerique(widget, value, champ_nom="Valeur"):
+    try:
+        float(value.replace('$', '').replace(',', '').strip())
+        widget.config(background="white")
+        return True
+    except:
+        widget.config(background="salmon")
+        return False
+
+

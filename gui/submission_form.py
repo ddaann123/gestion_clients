@@ -1,15 +1,23 @@
 import tkinter as tk
+import json
 from tkinter import ttk, messagebox
 from datetime import datetime
 from .submission_calcs import (calculate_distance, calculate_surface_per_mob, get_truck_tonnages, calculate_prix_par_sac, 
                                calculate_total_sacs, calculate_prix_total_sacs, calculer_quantite_sable, calculer_nombre_voyages_sable, 
                                calculer_prix_total_sable, calculer_heures_chantier, calculer_heures_transport, calculer_prix_total_machinerie, 
-                               calculer_prix_total_pension
+                               calculer_prix_total_pension, valider_entree_numerique
 )
 
 
 from config import DEFAULT_USD_CAD_RATE, THICKNESS_OPTIONS, SUBFLOOR_OPTIONS, DEFAULT_SUBFLOOR, POSE_MEMBRANE_OPTIONS
 
+
+
+def safe_float(value):
+    try:
+        return float(value.replace('$', '').replace(',', '').replace(' ', '').strip())
+    except Exception:
+        return 0.0
 
 
 class ProjectNotesWindow:
@@ -179,7 +187,7 @@ class SubmissionForm:
         self.total_surface_var = tk.StringVar(value="0")  # Stocke la surface totale
         self.mobilizations_var = tk.StringVar(value="1.0")  # Nombre de mobilisations
         self.surface_per_mob_var = tk.StringVar(value="0.0")  # Surface par mobilisation
-        self.area_var = tk.StringVar(value="0")  # Superficie (pi²)
+        self.area_var = tk.StringVar(value="")  # Superficie (pi²)
         self.area_var.trace("w", self.update_sealant_total)  # 🔁 observe changement de superficie
         self.area_var.trace("w", self.update_total_sacs)
         self.product_var = tk.StringVar()  # Produit sélectionné
@@ -256,27 +264,29 @@ class SubmissionForm:
         self.sous_total_fournisseurs_var = tk.StringVar(value="0.00")
         self.sous_total_main_machinerie_var = tk.StringVar(value="0.00 $")
         self.total_prix_coutants_var = tk.StringVar(value="0.00 $")
+        self.admin_profit_var = tk.StringVar(value="0 %")
+        self.admin_profit_montant_var = tk.StringVar(value="0.00 $")
+        self.prix_vente_client_var = tk.StringVar(value="0.00 $")
+        self.admin_profit_var.trace("w", self.update_admin_profit_montant)
+        self.admin_profit_var.trace("w", self.format_admin_profit_percent)
+        self.prix_unitaire_var = tk.StringVar(value="0.00 $")
+        self.prix_vente_client_var.trace("w", self.update_prix_unitaire)
+        self.area_var.trace("w", self.update_prix_unitaire)
+        self.prix_total_immeuble_var = tk.StringVar(value="0.00")
+        self.prix_pi2_ajuste_var = tk.StringVar(value="0.00")
+        self.prix_total_ajuste_var = tk.StringVar(value="0.00")
+        self.prix_unitaire_var.trace_add("write", self.update_prix_total_immeuble)
+        self.total_surface_var.trace_add("write", self.update_prix_total_immeuble)
+        self.admin_profit_var.trace("w", self.update_admin_profit_et_dependants)
+        self.prix_vente_client_var.trace("w", self.update_dependants_apres_vente)
 
 
 
 
+   
 
 
         
-
-
-        
-
-
-
-
-
-
-        print("[DEBUG] Trace sur distance_var installée")
-
-
-
-
 
 
 
@@ -392,7 +402,11 @@ class SubmissionForm:
 
         # Champ Superficie (pi²)
         tk.Label(calc_frame, text="Superficie (pi²) :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        tk.Entry(calc_frame, textvariable=self.area_var, width=10).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        entry_superficie = tk.Entry(calc_frame, textvariable=self.area_var, width=10)
+        entry_superficie.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        self.area_var.trace("w", lambda *args: valider_entree_numerique(entry_superficie, self.area_var.get(), "Superficie (pi²)"))
+
+
 
         # Champ Produit
         tk.Label(calc_frame, text="Produit :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
@@ -627,21 +641,21 @@ class SubmissionForm:
         ajust_label1 = tk.Entry(ajustements_frame, width=20)
         ajust_label1.insert(0, "Ajustement 1")
         ajust_label1.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        ajust_value1 = tk.Entry(ajustements_frame, textvariable=self.ajustement1_var, width=12, justify='right')
+        ajust_value1 = tk.Entry(ajustements_frame, textvariable=self.ajustement1_var, width=12, justify='center')
         ajust_value1.grid(row=0, column=1, padx=5, pady=5)
 
         # Champs Ajustement 2
         ajust_label2 = tk.Entry(ajustements_frame, width=20)
         ajust_label2.insert(0, "Ajustement 2")
         ajust_label2.grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        ajust_value2 = tk.Entry(ajustements_frame, textvariable=self.ajustement2_var, width=12, justify='right')
+        ajust_value2 = tk.Entry(ajustements_frame, textvariable=self.ajustement2_var, width=12, justify='center')
         ajust_value2.grid(row=1, column=1, padx=5, pady=5)
 
         # Champs Ajustement 3
         ajust_label3 = tk.Entry(ajustements_frame, width=20)
         ajust_label3.insert(0, "Ajustement 3")
         ajust_label3.grid(row=2, column=0, padx=5, pady=5, sticky="w")
-        ajust_value3 = tk.Entry(ajustements_frame, textvariable=self.ajustement3_var, width=12, justify='right')
+        ajust_value3 = tk.Entry(ajustements_frame, textvariable=self.ajustement3_var, width=12, justify='center')
         ajust_value3.grid(row=2, column=1, padx=5, pady=5)
 
 
@@ -682,10 +696,164 @@ class SubmissionForm:
                 width=12, relief="solid", borderwidth=1, anchor="center").grid(row=8, column=1, padx=5, pady=10, sticky="w")
 
 
+        # Champ Administ./profit (%)
+        tk.Label(ajustements_frame, text="Administ./profit :").grid(row=9, column=0, padx=5, pady=5, sticky="e")
+        entry_admin_profit = tk.Entry(ajustements_frame, textvariable=self.admin_profit_var, width=12, justify='center')
+        entry_admin_profit.grid(row=9, column=1, padx=5, pady=5, sticky="w")
+
+
+        # Champ Montant administ./profit ($)
+        tk.Label(ajustements_frame, text="Montant administ./profit ($) :").grid(row=10, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, textvariable=self.admin_profit_montant_var, width=12, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=10, column=1, padx=5, pady=5, sticky="w")
+
+        # Champ Prix de vente client ($)
+        tk.Label(ajustements_frame, text="Prix de vente client ($) :").grid(row=11, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, textvariable=self.prix_vente_client_var, width=12, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=11, column=1, padx=5, pady=5, sticky="w")
+
+
+        # Champ Prix unitaire au pi²
+        # Champ Prix unitaire au pi²
+        tk.Label(ajustements_frame, text="Prix unitaire au pi² :").grid(row=12, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, textvariable=self.prix_unitaire_var, width=12, relief="solid", borderwidth=1, anchor="center", font=('Helvetica', 10, 'bold')).grid(row=12, column=1, padx=5, pady=5, sticky="w")
+
+
+        # Champ Prix total par immeuble
+        tk.Label(ajustements_frame, text="Prix total par immeuble :").grid(row=13, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, textvariable=self.prix_total_immeuble_var, width=12, relief="solid", borderwidth=1, anchor="center", font=('Helvetica', 10, 'bold')).grid(row=13, column=1, padx=5, pady=5, sticky="w")
+
+        # Champ Prix au pi² ajusté (modifiable)
+        tk.Label(ajustements_frame, text="Prix au pi² ajusté :").grid(row=14, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(ajustements_frame, textvariable=self.prix_pi2_ajuste_var, width=12, justify='center').grid(row=14, column=1, padx=5, pady=5, sticky="w")
+
+        # Champ Prix total ajusté (modifiable)
+        tk.Label(ajustements_frame, text="Prix total ajusté :").grid(row=15, column=0, padx=5, pady=5, sticky="e")
+        tk.Entry(ajustements_frame, textvariable=self.prix_total_ajuste_var, width=12, justify='center').grid(row=15, column=1, padx=5, pady=5, sticky="w")
+
+
 
         # Boutons
-        tk.Button(self.window, text="Enregistrer", command=self.save_submission).pack(pady=10)
-        tk.Button(self.window, text="Annuler", command=self.window.destroy).pack(pady=5)
+        # ---- NOUVEAUX BOUTONS ----
+        btn_frame = ttk.Frame(self.window)
+        btn_frame.pack(pady=10)
+
+        tk.Button(btn_frame, text="Enregistrer comme Final", command=lambda: self.save_submission(final=True)).grid(row=0, column=0, padx=5)
+        tk.Button(btn_frame, text="Enregistrer comme Brouillon", command=lambda: self.save_submission(final=False)).grid(row=0, column=1, padx=5)
+        tk.Button(btn_frame, text="Créer une Révision", command=lambda: self.save_submission(final=True, revision=True)).grid(row=0, column=2, padx=5)
+        tk.Button(btn_frame, text="Dupliquer cette Soumission", command=lambda: self.save_submission(final=True, duplication=True)).grid(row=0, column=3, padx=5)
+        tk.Button(btn_frame, text="Annuler", command=self.window.destroy).grid(row=0, column=4, padx=5)
+
+
+
+
+
+    def update_dependants_apres_vente(self, *args):
+        self.update_prix_unitaire()
+        self.update_prix_total_immeuble()
+    
+
+
+    def update_prix_total_immeuble(self, *args):
+        try:
+            prix_unitaire = safe_float(self.prix_unitaire_var.get())
+            surface_totale = safe_float(self.total_surface_var.get())
+
+            total = prix_unitaire * surface_totale
+            self.prix_total_immeuble_var.set(f"{total:.2f} $")
+        except Exception as e:
+            print(f"[ERREUR] update_prix_total_immeuble : {e}")
+            self.prix_total_immeuble_var.set("0.00")
+
+
+        
+
+    def update_prix_unitaire(self, *args):
+        try:
+            prix_vente_str = self.prix_vente_client_var.get().replace(",", "").replace("$", "").strip()
+            superficie_str = self.area_var.get().replace(",", "").strip()
+
+            # Vérification de la validité numérique
+            if not prix_vente_str.replace('.', '', 1).isdigit() or not superficie_str.replace('.', '', 1).isdigit():
+                self.prix_unitaire_var.set("0.00")
+                return
+
+            prix_vente = safe_float(prix_vente_str)
+            superficie = safe_float(superficie_str)
+
+            if superficie == 0:
+                self.prix_unitaire_var.set("0.00")
+                return
+
+            unitaire = prix_vente / superficie
+            self.prix_unitaire_var.set(f"{unitaire:.2f}")
+        except Exception as e:
+            print(f"[ERREUR] update_prix_unitaire : {e}")
+            self.prix_unitaire_var.set("0.00")
+
+
+
+    def update_admin_profit_et_dependants(self, *args):
+        self.update_admin_profit_montant()
+        self.update_prix_unitaire()
+        self.update_prix_total_immeuble()
+
+
+
+    def update_prix_vente_client(self, *args):
+        try:
+            total_str = self.total_prix_coutants_var.get().replace(" $", "").strip()
+            admin_str = self.admin_profit_montant_var.get().replace(" $", "").strip()
+
+            print(f"[DEBUG] total_str={total_str}, admin_str={admin_str}")
+
+            if not total_str.replace('.', '', 1).isdigit() or not admin_str.replace('.', '', 1).isdigit():
+                raise ValueError("Valeur non numérique")
+
+            total = safe_float(total_str)
+            admin = safe_float(admin_str)
+
+            prix_vente = total + admin
+            self.prix_vente_client_var.set(f"{prix_vente:.2f} $")
+
+        except Exception as e:
+            print(f"[ERREUR] update_prix_vente_client : {e}")
+            self.prix_vente_client_var.set("Erreur")
+
+
+
+
+
+    def format_admin_profit_percent(self, *args):
+        value = self.admin_profit_var.get().replace('%', '').strip()
+        if value:
+            try:
+                float(value)  # validation numérique
+                self.admin_profit_var.set(f"{value} %")
+            except ValueError:
+                self.admin_profit_var.set("0 %")
+
+
+
+    def update_admin_profit_montant(self, *args):
+        try:
+            # Extraire le pourcentage (en retirant le symbole %)
+            pourcentage_str = self.admin_profit_var.get().replace('%', '').strip()
+            pourcentage = float(pourcentage_str) / 100
+
+            # Lire le total des prix coûtants
+            total_str = self.total_prix_coutants_var.get().replace('$', '').replace(',', '').strip()
+            total = float(total_str)
+
+            # Calcul du montant de profit
+            montant = total * pourcentage
+            self.admin_profit_montant_var.set(f"{montant:.2f} $")
+
+            # Calcul du prix de vente
+            prix_vente = total + montant
+            self.prix_vente_client_var.set(f"{prix_vente:.2f} $")
+
+        except Exception as e:
+            self.admin_profit_montant_var.set("Erreur")
+            self.prix_vente_client_var.set("Erreur")
 
 
     def update_total_prix_coutants(self, *args):
@@ -1062,37 +1230,102 @@ class SubmissionForm:
             submission_number = f"S{current_year % 100:02d}-{new_sequence:03d}"
             self.submission_number_var.set(submission_number)
 
-    def save_submission(self):
+    def save_submission(self, final=True, revision=False, duplication=False):
         try:
-            client_name = self.client_var.get()
-            contact = self.contact_var.get()
-            date_submission = self.date_var.get()
             submission_number = self.submission_number_var.get()
-            projet = self.projet_var.get("1.0", tk.END).strip()
-            ville = self.ville_var.get()
-            distance = self.distance_var.get()
-            notes = self.notes_data  # Inclure les notes temporaires
-            surfaces = self.surface_data  # Inclure les surfaces temporaires
-            area = self.area_var.get()
-            product = self.product_var.get()
-            ratio = self.ratio_var.get()
-            usd_cad_rate = self.usd_cad_rate_var.get()
-            thickness = self.thickness_var.get()
-            subfloor = self.subfloor_var.get()
 
-            if not client_name or not contact or not date_submission or not projet or not ville or not area:
-                raise ValueError("Tous les champs sont requis")
+            # Si duplication → générer un nouveau numéro
+            if duplication:
+                self.generate_submission_number()
+                submission_number = self.submission_number_var.get()
+                revision_number = 0
+            elif revision:
+                # Incrémenter la révision manuellement ou automatiquement selon la logique future
+                revision_number = 1  # Pour l'instant par défaut
+            else:
+                revision_number = 0
 
-            # Pour l'instant, afficher les données (sauvegarde dans la base à venir)
-            message = f"Soumission {submission_number} prête à être sauvegardée.\nNotes : {notes}\nSurfaces : {surfaces}\nParamètres : Superficie={area}, Produit={product}, Ratio={ratio}, Taux USD/CAD={usd_cad_rate}, Épaisseur={thickness}, Type de sous-plancher={subfloor}"
-            messagebox.showinfo("Info", message)
-            self.window.destroy()  # Ferme la fenêtre et efface les données
-            self.notes_data.clear()  # Efface les notes après enregistrement
-            self.surface_data.clear()  # Efface les surfaces après enregistrement
-        except ValueError as e:
-            messagebox.showerror("Erreur", str(e))
+            etat = "finalisé" if final else "brouillon"
+            current_year = datetime.now().year
+            sequence = int(submission_number.split("-")[1]) if "-" in submission_number else 0
+
+            data = {
+                "submission_number": submission_number,
+                "revision": revision_number,
+                "is_active": 1,
+                "etat": etat,
+                "year": current_year,
+                "sequence": sequence,
+
+                "date_submission": self.date_var.get(),
+                "client_name": self.client_var.get(),
+                "contact": self.contact_var.get(),
+                "projet": self.projet_var.get("1.0", tk.END).strip(),
+                "ville": self.ville_var.get(),
+                "distance": self.distance_var.get(),
+
+                "area": self.area_var.get(),
+                "product": self.product_var.get(),
+                "ratio": self.ratio_var.get(),
+                "usd_cad_rate": self.usd_cad_rate_var.get(),
+                "thickness": self.thickness_var.get(),
+                "subfloor": self.subfloor_var.get(),
+                "membrane": self.membrane_var.get(),
+                "pose_membrane": self.pose_membrane_var.get(),
+
+                "sealant": self.sealant_var.get(),
+                "prix_par_sac": self.prix_par_sac_var.get(),
+                "total_sacs": self.total_sacs_var.get(),
+                "prix_total_sacs": self.prix_total_sacs_var.get(),
+                "sable_total": self.sable_total_var.get(),
+                "voyages_sable": self.nombre_voyages_var.get(),
+                "prix_total_sable": self.prix_total_sable_var.get(),
+                "mobilisations": self.mobilizations_var.get(),
+                "surface_per_mob": self.surface_per_mob_var.get(),
+
+                "type_main": self.type_main_var.get(),
+                "type_pension": self.type_pension_var.get(),
+                "type_machinerie": self.type_machinerie_var.get(),
+                "nb_hommes": self.nombre_hommes_var.get(),
+                "heures_chantier": self.heures_chantier_var.get(),
+                "heures_transport": self.heures_transport_var.get(),
+                "prix_total_pension": self.prix_total_pension_var.get(),
+                "prix_total_machinerie": self.prix_total_machinerie_var.get(),
+                "prix_total_heures_chantier": self.prix_total_heures_chantier_var.get(),
+                "prix_total_heures_transport": self.prix_total_heures_transport_var.get(),
+
+                "ajustement1_nom": "Ajustement 1",
+                "ajustement1_valeur": self.ajustement1_var.get(),
+                "ajustement2_nom": "Ajustement 2",
+                "ajustement2_valeur": self.ajustement2_var.get(),
+                "ajustement3_nom": "Ajustement 3",
+                "ajustement3_valeur": self.ajustement3_var.get(),
+                "reperes_nivellement": self.reperes_var.get(),
+
+                "sous_total_ajustements": self.sous_total_ajustements_var.get(),
+                "sous_total_fournisseurs": self.sous_total_fournisseurs_var.get(),
+                "sous_total_main_machinerie": self.sous_total_main_machinerie_var.get(),
+                "total_prix_coutants": self.total_prix_coutants_var.get(),
+
+                "admin_profit_pct": self.admin_profit_var.get(),
+                "admin_profit_montant": self.admin_profit_montant_var.get(),
+                "prix_vente_client": self.prix_vente_client_var.get(),
+                "prix_unitaire": self.prix_unitaire_var.get(),
+                "prix_total_immeuble": self.prix_total_immeuble_var.get(),
+                "prix_pi2_ajuste": self.prix_pi2_ajuste_var.get(),
+                "prix_total_ajuste": self.prix_total_ajuste_var.get(),
+
+                "notes_json": json.dumps(self.notes_data),
+                "surfaces_json": json.dumps(self.surface_data)
+            }
+
+            self.db_manager.insert_submission(data)
+            messagebox.showinfo("Succès", f"Soumission enregistrée : {submission_number}")
+            self.window.destroy()
+
         except Exception as e:
-            messagebox.showerror("Erreur", f"Erreur : {e}")
+            messagebox.showerror("Erreur", f"Erreur lors de l’enregistrement : {e}")
+
 
     def open_project_notes(self):
         # Ouvre la fenêtre des notes et passe les données actuelles

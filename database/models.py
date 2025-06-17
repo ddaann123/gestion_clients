@@ -54,15 +54,82 @@ def init_database(db_path):
         """)
         
         # Table soumissions
+
+        cursor.execute("DROP TABLE IF EXISTS submissions")
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS submissions (
                 submission_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                submission_number TEXT UNIQUE,
+                submission_number TEXT NOT NULL,
+                revision INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,  -- 1 = active, 0 = ancienne révision
+                etat TEXT CHECK(etat IN ('brouillon', 'finalisé')) NOT NULL,
+
                 year INTEGER,
                 sequence INTEGER,
+
+                date_submission TEXT,
                 client_name TEXT,
-                etat TEXT CHECK(etat IN ('brouillon', 'finalisé'))
+                contact TEXT,
+                projet TEXT,
+                ville TEXT,
+                distance TEXT,
+
+                area TEXT,
+                product TEXT,
+                ratio TEXT,
+                usd_cad_rate TEXT,
+                thickness TEXT,
+                subfloor TEXT,
+                membrane TEXT,
+                pose_membrane TEXT,
+
+                sealant TEXT,
+                prix_par_sac TEXT,
+                total_sacs TEXT,
+                prix_total_sacs TEXT,
+                sable_total TEXT,
+                voyages_sable TEXT,
+                prix_total_sable TEXT,
+                mobilisations TEXT,
+                surface_per_mob TEXT,
+
+                type_main TEXT,
+                type_pension TEXT,
+                type_machinerie TEXT,
+                nb_hommes TEXT,
+                heures_chantier TEXT,
+                heures_transport TEXT,
+                prix_total_pension TEXT,
+                prix_total_machinerie TEXT,
+                prix_total_heures_chantier TEXT,
+                prix_total_heures_transport TEXT,
+
+                ajustement1_nom TEXT,
+                ajustement1_valeur TEXT,
+                ajustement2_nom TEXT,
+                ajustement2_valeur TEXT,
+                ajustement3_nom TEXT,
+                ajustement3_valeur TEXT,
+                reperes_nivellement TEXT,
+
+                sous_total_ajustements TEXT,
+                sous_total_fournisseurs TEXT,
+                sous_total_main_machinerie TEXT,
+                total_prix_coutants TEXT,
+
+                admin_profit_pct TEXT,
+                admin_profit_montant TEXT,
+                prix_vente_client TEXT,
+                prix_unitaire TEXT,
+                prix_total_immeuble TEXT,
+                prix_pi2_ajuste TEXT,
+                prix_total_ajuste TEXT,
+
+                notes_json TEXT,
+                surfaces_json TEXT
             )
+
         """)
         
         # Nouvelle table sable

@@ -1,5 +1,6 @@
 import sqlite3
 from contextlib import contextmanager
+import json
 
 class DatabaseManager:
     def __init__(self, db_path):
@@ -404,3 +405,14 @@ class DatabaseManager:
             cursor.execute("DELETE FROM membranes WHERE id = ?", (membranes_id,))
             conn.commit()
     
+
+    def insert_submission(self, data: dict):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            columns = ', '.join(data.keys())
+            placeholders = ', '.join(['?'] * len(data))
+            values = list(data.values())
+            cursor.execute(f"""
+                INSERT INTO submissions ({columns}) VALUES ({placeholders})
+            """, values)
+            conn.commit()
