@@ -25,6 +25,9 @@ class MainWindow:
         tk.Button(search_frame, text="Rechercher", command=self.search_clients).pack(side="left", padx=5)
         tk.Button(search_frame, text="Réinitialiser", command=self.reset_search).pack(side="left", padx=5)
 
+        tk.Button(search_frame, text="Recherche soumission", command=self.open_submission_search).pack(side="left", padx=5)
+
+
         # Section liste des clients
         list_frame = ttk.LabelFrame(main_frame, text="Liste des clients", padding=10)
         list_frame.pack(fill="both", expand=True, pady=5)
@@ -53,6 +56,12 @@ class MainWindow:
 
         # Charger la liste initiale
         self.load_clients()
+
+
+    def open_submission_search(self):
+        from gui.submission_search_window import SubmissionSearchWindow
+        SubmissionSearchWindow(self.root, self.db_manager)
+
 
     def load_clients(self, clients=None):
         """Charge ou actualise la liste des clients dans le Treeview."""

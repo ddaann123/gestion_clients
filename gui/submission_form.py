@@ -7,6 +7,9 @@ from .submission_calcs import (calculate_distance, calculate_surface_per_mob, ge
                                calculer_prix_total_sable, calculer_heures_chantier, calculer_heures_transport, calculer_prix_total_machinerie, 
                                calculer_prix_total_pension, valider_entree_numerique
 )
+from gui.export_devis import ExportDevisWindow
+
+
 
 
 from config import DEFAULT_USD_CAD_RATE, THICKNESS_OPTIONS, SUBFLOOR_OPTIONS, DEFAULT_SUBFLOOR, POSE_MEMBRANE_OPTIONS
@@ -178,7 +181,7 @@ class DetailedSurfaceWindow:
 
 class SubmissionForm:
      
-    def __init__(self, parent, db_manager, selected_client=None, selected_contact=None):
+    def __init__(self, parent, db_manager, selected_client=None, selected_contact=None, existing_submission=None):
         self.db_manager = db_manager
         self.selected_client = selected_client
         self.selected_contact = selected_contact
@@ -279,6 +282,11 @@ class SubmissionForm:
         self.total_surface_var.trace_add("write", self.update_prix_total_immeuble)
         self.admin_profit_var.trace("w", self.update_admin_profit_et_dependants)
         self.prix_vente_client_var.trace("w", self.update_dependants_apres_vente)
+        self.transport_sector_var.trace_add("write", self.update_sable_total)
+        self.truck_tonnage_var.trace_add("write", self.update_sable_total)
+        self.sable_transporter_var.trace_add("write", self.update_sable_total)
+
+
 
 
 
@@ -359,7 +367,6 @@ class SubmissionForm:
         # Champ No Soumission
         tk.Label(gen_frame, text="No Soumission :").grid(row=3, column=0, padx=5, pady=5, sticky="w")
         self.submission_number_var = tk.StringVar()
-        self.generate_submission_number()
         tk.Entry(gen_frame, textvariable=self.submission_number_var, state="disabled", width=30).grid(row=3, column=1, padx=5, pady=5)
 
         # Frame Détails du Projet
@@ -741,7 +748,83 @@ class SubmissionForm:
         tk.Button(btn_frame, text="Créer une Révision", command=lambda: self.save_submission(final=True, revision=True)).grid(row=0, column=2, padx=5)
         tk.Button(btn_frame, text="Dupliquer cette Soumission", command=lambda: self.save_submission(final=True, duplication=True)).grid(row=0, column=3, padx=5)
         tk.Button(btn_frame, text="Annuler", command=self.window.destroy).grid(row=0, column=4, padx=5)
+        tk.Button(btn_frame, text="Générer le devis", command=self.generer_devis).grid(row=0, column=5, padx=5)
 
+
+        self.existing_submission = existing_submission
+        self.init_chargement()
+
+
+
+    def init_chargement(self):
+        if self.existing_submission:
+            self.charger_donnees_submission(self.existing_submission)
+        else:
+            self.generate_submission_number()
+
+
+
+    def charger_donnees_submission(self, data):
+        self.submission_number_var.set(data.get("submission_number", ""))
+        self.date_var.set(data.get("date_submission", ""))
+        self.client_var.set(data.get("client_name", ""))
+        self.contact_var.set(data.get("contact", ""))
+        self.projet_var.delete("1.0", tk.END)
+        self.projet_var.insert("1.0", data.get("projet", ""))
+        self.ville_var.set(data.get("ville", ""))
+        self.distance_var.set(data.get("distance", ""))
+
+        self.area_var.set(data.get("area", ""))
+        self.product_var.set(data.get("product", ""))
+        self.ratio_var.set(data.get("ratio", ""))
+        self.usd_cad_rate_var.set(data.get("usd_cad_rate", ""))
+        self.thickness_var.set(data.get("thickness", ""))
+        self.subfloor_var.set(data.get("subfloor", ""))
+        self.membrane_var.set(data.get("membrane", ""))
+        self.pose_membrane_var.set(data.get("pose_membrane", ""))
+        self.sealant_var.set(data.get("sealant", ""))
+
+        self.prix_par_sac_var.set(data.get("prix_par_sac", ""))
+        self.total_sacs_var.set(data.get("total_sacs", ""))
+        self.prix_total_sacs_var.set(data.get("prix_total_sacs", ""))
+        self.sable_total_var.set(data.get("sable_total", ""))
+        self.nombre_voyages_var.set(data.get("voyages_sable", ""))
+        self.prix_total_sable_var.set(data.get("prix_total_sable", ""))
+        self.mobilizations_var.set(data.get("mobilisations", ""))
+        self.surface_per_mob_var.set(data.get("surface_per_mob", ""))
+
+        self.type_main_var.set(data.get("type_main", ""))
+        self.type_pension_var.set(data.get("type_pension", ""))
+        self.type_machinerie_var.set(data.get("type_machinerie", ""))
+        self.nombre_hommes_var.set(data.get("nb_hommes", ""))
+        self.heures_chantier_var.set(data.get("heures_chantier", ""))
+        self.heures_transport_var.set(data.get("heures_transport", ""))
+        self.prix_total_pension_var.set(data.get("prix_total_pension", ""))
+        self.prix_total_machinerie_var.set(data.get("prix_total_machinerie", ""))
+        self.prix_total_heures_chantier_var.set(data.get("prix_total_heures_chantier", ""))
+        self.prix_total_heures_transport_var.set(data.get("prix_total_heures_transport", ""))
+
+        self.ajustement1_var.set(data.get("ajustement1_valeur", ""))
+        self.ajustement2_var.set(data.get("ajustement2_valeur", ""))
+        self.ajustement3_var.set(data.get("ajustement3_valeur", ""))
+        self.reperes_var.set(data.get("reperes_nivellement", ""))
+
+        self.sous_total_ajustements_var.set(data.get("sous_total_ajustements", ""))
+        self.sous_total_fournisseurs_var.set(data.get("sous_total_fournisseurs", ""))
+        self.sous_total_main_machinerie_var.set(data.get("sous_total_main_machinerie", ""))
+        self.total_prix_coutants_var.set(data.get("total_prix_coutants", ""))
+
+        self.admin_profit_var.set(data.get("admin_profit_pct", ""))
+        self.admin_profit_montant_var.set(data.get("admin_profit_montant", ""))
+        self.prix_vente_client_var.set(data.get("prix_vente_client", ""))
+        self.prix_unitaire_var.set(data.get("prix_unitaire", ""))
+        self.prix_total_immeuble_var.set(data.get("prix_total_immeuble", ""))
+        self.prix_pi2_ajuste_var.set(data.get("prix_pi2_ajuste", ""))
+        self.prix_total_ajuste_var.set(data.get("prix_total_ajuste", ""))
+
+        import json
+        self.notes_data = json.loads(data.get("notes_json", "{}"))
+        self.surface_data = json.loads(data.get("surfaces_json", "{}"))
 
 
 
@@ -1095,9 +1178,63 @@ class SubmissionForm:
         sable_total = calculer_quantite_sable(nb_sacs, ratio)
         self.sable_total_var.set(sable_total)
 
-
-        if sable_total.isdigit():  # 👈 évite les erreurs si 'Erreur'
+        if sable_total.isdigit():
             self.update_nombre_voyages()
+
+        # ➕ Met à jour le prix du sable
+        self.update_prix_total_sable()
+
+
+    def update_prix_total_sable(self, *args):
+        try:
+            transporteur = self.sable_transporter_var.get()
+            tonnage_str = self.truck_tonnage_var.get()
+            secteur = self.transport_sector_var.get()
+
+
+            if not (transporteur and tonnage_str and secteur):
+                self.prix_total_sable_var.set("0.00")
+                return
+
+            tonnage = int(tonnage_str)
+            sable_data = self.db_manager.get_sable()
+            
+
+            entry = next(
+                (row for row in sable_data if row[1] == transporteur and row[2] == tonnage and row[3] == secteur),
+                None
+            )
+
+            if not entry:
+                
+                self.prix_total_sable_var.set("Erreur")
+                return
+
+            prix_voyage = float(entry[4])
+            prix_sable_tm = float(entry[5])
+            
+
+            sable_total_str = self.sable_total_var.get().replace(",", "")
+            sable_total = float(sable_total_str) if sable_total_str else 0.0
+           
+
+            # Calcul du nombre de voyages requis
+            voyages = max(1, int((sable_total + tonnage - 1) // tonnage))  # arrondi supérieur
+            
+
+            total_sable = sable_total * prix_sable_tm
+            total_transport = voyages * prix_voyage
+            total = round(total_sable + total_transport, 2)
+
+
+
+            self.prix_total_sable_var.set(f"{total:,.2f}")
+
+        except Exception as e:
+
+            self.prix_total_sable_var.set("Erreur")
+
+
 
 
     def update_prix_total_sacs(self, *args):
@@ -1191,32 +1328,41 @@ class SubmissionForm:
 
 
     def update_truck_tonnage_options(self, *args):
-        """Mettre à jour les options de tonnage et secteur en fonction du transporteur sélectionné."""
         selected_transporter = self.sable_transporter_var.get()
         truck_tonnages = get_truck_tonnages(self.db_manager, selected_transporter) if selected_transporter else []
-        transport_sectors = sorted(set(row[3] for row in self.db_manager.get_sable() if row[1] == selected_transporter)) if selected_transporter else []
 
-        # Mettre à jour le menu Tonnage camion
+        # Met à jour le menu de tonnage
         menu_tonnage = self.truck_tonnage_menu["menu"]
         menu_tonnage.delete(0, "end")
         for tonnage in truck_tonnages:
-            menu_tonnage.add_command(label=str(tonnage), command=lambda x=str(tonnage): self.truck_tonnage_var.set(x))
+            menu_tonnage.add_command(label=str(tonnage), command=lambda x=str(tonnage): self.on_truck_tonnage_change(x))
         self.truck_tonnage_menu.config(state="normal" if truck_tonnages else "disabled")
-        if truck_tonnages:
-            self.truck_tonnage_var.set(str(truck_tonnages[0]))  # Définir le premier tonnage par défaut
-        else:
-            self.truck_tonnage_var.set("")
+        self.truck_tonnage_var.set(str(truck_tonnages[0]) if truck_tonnages else "")
 
-        # Mettre à jour le menu Secteur de transport
+        # Rafraîchit les secteurs selon le premier tonnage (ou vide)
+        self.update_transport_sector_options()
+
+    def on_truck_tonnage_change(self, tonnage):
+        self.truck_tonnage_var.set(tonnage)
+        self.update_transport_sector_options()
+
+    def update_transport_sector_options(self):
+        selected_transporter = self.sable_transporter_var.get()
+        selected_tonnage = self.truck_tonnage_var.get()
+
+        sable_data = self.db_manager.get_sable()
+        transport_sectors = sorted(set(
+            row[3] for row in sable_data
+            if row[1] == selected_transporter and str(row[2]) == selected_tonnage
+        ))
+
         menu_sector = self.transport_sector_menu["menu"]
         menu_sector.delete(0, "end")
         for sector in transport_sectors:
             menu_sector.add_command(label=sector, command=lambda x=sector: self.transport_sector_var.set(x))
         self.transport_sector_menu.config(state="normal" if transport_sectors else "disabled")
-        if transport_sectors:
-            self.transport_sector_var.set(transport_sectors[0])  # Définir la première ville par défaut
-        else:
-            self.transport_sector_var.set("")
+        self.transport_sector_var.set(transport_sectors[0] if transport_sectors else "")
+
 
     def generate_submission_number(self):
         current_year = datetime.now().year
@@ -1226,7 +1372,7 @@ class SubmissionForm:
                 SELECT MAX(sequence) FROM submissions WHERE year = ?
             """, (current_year,))
             max_sequence = cursor.fetchone()[0]
-            new_sequence = 1 if max_sequence is None else max_sequence + 1
+            new_sequence = 200 if max_sequence is None else max_sequence + 1
             submission_number = f"S{current_year % 100:02d}-{new_sequence:03d}"
             self.submission_number_var.set(submission_number)
 
@@ -1234,20 +1380,35 @@ class SubmissionForm:
         try:
             submission_number = self.submission_number_var.get()
 
-            # Si duplication → générer un nouveau numéro
             if duplication:
+                # Crée un tout nouveau numéro unique (ex: S25-402)
                 self.generate_submission_number()
                 submission_number = self.submission_number_var.get()
                 revision_number = 0
+
             elif revision:
-                # Incrémenter la révision manuellement ou automatiquement selon la logique future
-                revision_number = 1  # Pour l'instant par défaut
+                # Extrait le préfixe (ex: S25-402)
+                base_number = submission_number.split(" ")[0]
+                with self.db_manager.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        SELECT MAX(revision) FROM submissions WHERE submission_number LIKE ?
+                    """, (f"{base_number}%",))
+                    max_rev = cursor.fetchone()[0]
+                    revision_number = (max_rev or 0) + 1
+
+                # Formate avec REV.n
+                submission_number = f"{base_number} REV.{revision_number}"
+
             else:
                 revision_number = 0
 
+            # Met à jour visuellement le champ
+            self.submission_number_var.set(submission_number)
+
             etat = "finalisé" if final else "brouillon"
             current_year = datetime.now().year
-            sequence = int(submission_number.split("-")[1]) if "-" in submission_number else 0
+            sequence = int(submission_number.split("-")[1].split()[0]) if "-" in submission_number else 0
 
             data = {
                 "submission_number": submission_number,
@@ -1256,14 +1417,12 @@ class SubmissionForm:
                 "etat": etat,
                 "year": current_year,
                 "sequence": sequence,
-
                 "date_submission": self.date_var.get(),
                 "client_name": self.client_var.get(),
                 "contact": self.contact_var.get(),
                 "projet": self.projet_var.get("1.0", tk.END).strip(),
                 "ville": self.ville_var.get(),
                 "distance": self.distance_var.get(),
-
                 "area": self.area_var.get(),
                 "product": self.product_var.get(),
                 "ratio": self.ratio_var.get(),
@@ -1272,7 +1431,6 @@ class SubmissionForm:
                 "subfloor": self.subfloor_var.get(),
                 "membrane": self.membrane_var.get(),
                 "pose_membrane": self.pose_membrane_var.get(),
-
                 "sealant": self.sealant_var.get(),
                 "prix_par_sac": self.prix_par_sac_var.get(),
                 "total_sacs": self.total_sacs_var.get(),
@@ -1282,7 +1440,6 @@ class SubmissionForm:
                 "prix_total_sable": self.prix_total_sable_var.get(),
                 "mobilisations": self.mobilizations_var.get(),
                 "surface_per_mob": self.surface_per_mob_var.get(),
-
                 "type_main": self.type_main_var.get(),
                 "type_pension": self.type_pension_var.get(),
                 "type_machinerie": self.type_machinerie_var.get(),
@@ -1293,7 +1450,6 @@ class SubmissionForm:
                 "prix_total_machinerie": self.prix_total_machinerie_var.get(),
                 "prix_total_heures_chantier": self.prix_total_heures_chantier_var.get(),
                 "prix_total_heures_transport": self.prix_total_heures_transport_var.get(),
-
                 "ajustement1_nom": "Ajustement 1",
                 "ajustement1_valeur": self.ajustement1_var.get(),
                 "ajustement2_nom": "Ajustement 2",
@@ -1301,12 +1457,10 @@ class SubmissionForm:
                 "ajustement3_nom": "Ajustement 3",
                 "ajustement3_valeur": self.ajustement3_var.get(),
                 "reperes_nivellement": self.reperes_var.get(),
-
                 "sous_total_ajustements": self.sous_total_ajustements_var.get(),
                 "sous_total_fournisseurs": self.sous_total_fournisseurs_var.get(),
                 "sous_total_main_machinerie": self.sous_total_main_machinerie_var.get(),
                 "total_prix_coutants": self.total_prix_coutants_var.get(),
-
                 "admin_profit_pct": self.admin_profit_var.get(),
                 "admin_profit_montant": self.admin_profit_montant_var.get(),
                 "prix_vente_client": self.prix_vente_client_var.get(),
@@ -1314,17 +1468,21 @@ class SubmissionForm:
                 "prix_total_immeuble": self.prix_total_immeuble_var.get(),
                 "prix_pi2_ajuste": self.prix_pi2_ajuste_var.get(),
                 "prix_total_ajuste": self.prix_total_ajuste_var.get(),
-
                 "notes_json": json.dumps(self.notes_data),
                 "surfaces_json": json.dumps(self.surface_data)
             }
 
             self.db_manager.insert_submission(data)
             messagebox.showinfo("Succès", f"Soumission enregistrée : {submission_number}")
+
+
             self.window.destroy()
+
 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l’enregistrement : {e}")
+
+
 
 
     def open_project_notes(self):
@@ -1377,3 +1535,29 @@ class SubmissionForm:
         else:
             self.ratio_var.set("")
             self.ratio_menu.config(state="disabled")
+
+    def generer_devis(self):
+        try:
+            from gui.export_devis import ExportDevisWindow
+
+            data = {
+                "submission_number": self.submission_number_var.get(),
+                "date_submission": self.date_var.get(),
+                "client_name": self.client_var.get(),
+                "contact": self.contact_var.get(),
+                "projet": self.projet_var.get("1.0", "end").strip(),
+                "ville": self.ville_var.get(),
+                "product": self.product_var.get(),
+                "area": self.area_var.get(),
+                "thickness": self.thickness_var.get(),
+                "prix_unitaire": self.prix_unitaire_var.get(),
+                "mobilisations": self.mobilizations_var.get(),
+                "membrane": self.membrane_var.get(),
+
+            }
+
+            ExportDevisWindow(self.window, data, self.db_manager)
+
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de l’ouverture de la fenêtre d’export : {e}")
+

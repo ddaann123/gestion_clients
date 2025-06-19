@@ -1,12 +1,18 @@
 import sqlite3
 from contextlib import contextmanager
 import json
+import os
 
 class DatabaseManager:
-    def __init__(self, db_path):
-        self.db_path = db_path
+    def __init__(self, db_path=None):
+        if db_path is None:
+            base_dir = os.path.dirname(os.path.abspath(__file__))  # chemin vers gui/
+            db_path = os.path.join(base_dir, "../database/clients.db")
+        self.db_path = os.path.abspath(db_path)
         from .models import init_database
-        init_database(db_path)
+        init_database(self.db_path)
+        print(f"[DEBUG] Base de données utilisée : {self.db_path}")
+
     
     @contextmanager
     def get_connection(self):
@@ -130,7 +136,18 @@ class DatabaseManager:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
+
             conn.commit()
+
+    def get_contact_by_name(self, nom):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT telephone, courriel FROM contacts
+                WHERE LOWER(nom) = LOWER(?)
+            """, (nom,))
+            return cursor.fetchone()
+
     
     def get_main_doeuvre(self):
         with self.get_connection() as conn:
@@ -412,7 +429,116 @@ class DatabaseManager:
             columns = ', '.join(data.keys())
             placeholders = ', '.join(['?'] * len(data))
             values = list(data.values())
-            cursor.execute(f"""
-                INSERT INTO submissions ({columns}) VALUES ({placeholders})
-            """, values)
+
+            try:
+                cursor.execute(f"""
+                    INSERT INTO submissions ({columns}) VALUES ({placeholders})
+                """, values)
+                conn.commit()
+            except sqlite3.IntegrityError as e:
+                if "submission_number" in str(e):
+                    raise ValueError(f"Le numéro de soumission « {data.get('submission_number')} » existe déjà.")
+                else:
+                    raise
+
+
+    def search_submissions(self, filters):
+        """
+        Recherche les soumissions selon les filtres fournis.
+        filters : dict avec des clés parmi :
+            - submission_number
+            - client_name
+            - contact
+            - projet
+            - ville
+            - etat
+            - date_min
+            - date_max
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT submission_number, client_name, contact, projet, ville, etat, date_submission
+                FROM submissions
+                WHERE 1=1
+            """
+
+            params = []
+
+            if filters.get("submission_number"):
+                query += " AND submission_number LIKE ?"
+                params.append(f"%{filters['submission_number']}%")
+
+            if filters.get("client_name"):
+                query += " AND client_name LIKE ?"
+                params.append(f"%{filters['client_name']}%")
+
+            if filters.get("contact"):
+                query += " AND contact LIKE ?"
+                params.append(f"%{filters['contact']}%")
+
+            if filters.get("projet"):
+                query += " AND projet LIKE ?"
+                params.append(f"%{filters['projet']}%")
+
+            if filters.get("ville"):
+                query += " AND ville LIKE ?"
+                params.append(f"%{filters['ville']}%")
+
+            if filters.get("etat") in ("brouillon", "finalisé"):
+                query += " AND etat = ?"
+                params.append(filters["etat"])
+
+            if filters.get("date_min"):
+                query += " AND date_submission >= ?"
+                params.append(filters["date_min"])
+
+            if filters.get("date_max"):
+                query += " AND date_submission <= ?"
+                params.append(filters["date_max"])
+
+            cursor.execute(query, params)
+            return cursor.fetchall()
+
+    def charger_soumission(self, submission_number):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM submissions WHERE submission_number = ?
+            """, (submission_number,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+
+            # Récupère les noms des colonnes pour retourner un dictionnaire
+            colonnes = [desc[0] for desc in cursor.description]
+            data = dict(zip(colonnes, row))
+            return data
+
+    def marquer_soumission_inactive(self, submission_number):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE submissions
+                SET is_active = 0
+                WHERE submission_number = ?
+            """, (submission_number,))
             conn.commit()
+
+    def supprimer_soumission(self, submission_number):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM submissions WHERE submission_number = ?", (submission_number,))
+            conn.commit()
+
+
+    def get_membrane_by_nom(self, nom_membrane):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions
+                FROM membranes
+                WHERE LOWER(modele_membrane) = ?
+            """, (nom_membrane.strip().lower(),))
+            return cursor.fetchone()

@@ -23,10 +23,10 @@ def calculate_surface_per_mob(total_surface, mobilizations):
         return "Erreur"
     
 
-def get_truck_tonnages(db_manager, transporter):
+def get_truck_tonnages(db_manager, transporteur):
     """Retourne une liste triée des tonnages (camion) pour un transporteur donné."""
     sable_data = db_manager.get_sable()
-    truck_tonnages = sorted(set(row[2] for row in sable_data if row[1] == transporter))  # Colonne 2 est camion
+    truck_tonnages = sorted(set(row[2] for row in sable_data if row[1] == transporteur))  # Colonne 2 est camion
     return truck_tonnages if truck_tonnages else []
 
 def calculate_prix_par_sac(product_name, usd_cad_rate, db_manager):

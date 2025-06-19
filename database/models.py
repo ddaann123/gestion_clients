@@ -55,8 +55,6 @@ def init_database(db_path):
         
         # Table soumissions
 
-        cursor.execute("DROP TABLE IF EXISTS submissions")
-
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS submissions (
                 submission_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,6 +130,10 @@ def init_database(db_path):
 
         """)
         
+        migrer_table_submissions_si_necessaire(conn)
+
+
+
         # Nouvelle table sable
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sable (
@@ -198,3 +200,28 @@ def init_database(db_path):
         """)
 
         conn.commit()
+
+def migrer_table_submissions_si_necessaire(conn):
+    cursor = conn.cursor()
+
+    # Liste des colonnes attendues (nom: définition SQL si absente)
+    colonnes_attendues = {
+        "revision": "ALTER TABLE submissions ADD COLUMN revision INTEGER DEFAULT 0",
+        "is_active": "ALTER TABLE submissions ADD COLUMN is_active BOOLEAN DEFAULT 1",
+        "sequence": "ALTER TABLE submissions ADD COLUMN sequence INTEGER",
+        "notes_json": "ALTER TABLE submissions ADD COLUMN notes_json TEXT",
+        "surfaces_json": "ALTER TABLE submissions ADD COLUMN surfaces_json TEXT"
+    }
+
+    # Obtenir les colonnes existantes
+    cursor.execute("PRAGMA table_info(submissions)")
+    colonnes_existantes = {row[1] for row in cursor.fetchall()}
+
+    # Ajouter les colonnes manquantes
+    for colonne, commande_sql in colonnes_attendues.items():
+        if colonne not in colonnes_existantes:
+            print(f"[MIGRATION] Ajout de la colonne manquante : {colonne}")
+            cursor.execute(commande_sql)
+
+    conn.commit()
+
