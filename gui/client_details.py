@@ -92,13 +92,21 @@ class ClientDetails:
         self.contact_tree.pack(fill="both", expand=True)
         self.contact_tree.bind("<<TreeviewSelect>>", self.select_contact)
 
-        # Boutons contacts
+        # Ligne unique avec groupe à gauche et un bouton à droite
         action_frame = ttk.Frame(contacts_frame)
         action_frame.pack(fill="x", pady=5)
-        tk.Button(action_frame, text="Ajouter Contact", command=self.add_contact).pack(side="left", padx=5)
-        tk.Button(action_frame, text="Modifier Contact", command=self.edit_contact).pack(side="left", padx=5)
-        tk.Button(action_frame, text="Supprimer Contact", command=self.delete_contact).pack(side="left", padx=5)
-        tk.Button(action_frame, text="Feuille de calcul", command=self.open_submission_form).pack(side="left", padx=5)
+
+        # Groupe de gauche
+        left_group = ttk.Frame(action_frame)
+        left_group.pack(side="left")
+
+        tk.Button(left_group, text="Ajouter Contact", command=self.add_contact).pack(side="left", padx=5)
+        tk.Button(left_group, text="Modifier Contact", command=self.edit_contact).pack(side="left", padx=5)
+        tk.Button(left_group, text="Supprimer Contact", command=self.delete_contact).pack(side="left", padx=5)
+
+        # Bouton à droite
+        tk.Button(action_frame, text="Feuille de calcul", command=self.open_submission_form).pack(side="right", padx=5)
+
 
         # Charger les contacts
         self.load_contacts()

@@ -10,7 +10,7 @@ class MainWindow:
         self.root = root
         self.db_manager = db_manager
         self.root.title("Gestion des clients - PBL")
-        self.root.geometry("800x600")
+        self.root.geometry("900x700")
 
         # Frame principal
         main_frame = ttk.Frame(self.root)
@@ -48,11 +48,18 @@ class MainWindow:
         # Section actions
         action_frame = ttk.LabelFrame(main_frame, text="Actions", padding=10)
         action_frame.pack(fill="x", pady=5)
-        tk.Button(action_frame, text="Ajouter Client", command=self.open_client_form).pack(side="left", padx=5)
-        tk.Button(action_frame, text="Modifier Client", command=self.edit_client).pack(side="left", padx=5)
-        tk.Button(action_frame, text="Supprimer Client", command=self.delete_client).pack(side="left", padx=5)
-        tk.Button(action_frame, text="Détails Client", command=self.open_client_details).pack(side="left", padx=5)
-        tk.Button(action_frame, text="Gestion des paramètres", command=self.open_parameters).pack(side="left", padx=5)
+
+        # Groupe de gauche
+        left_frame = tk.Frame(action_frame)
+        left_frame.pack(side="left")
+
+        tk.Button(left_frame, text="Ajouter Client", command=self.open_client_form).pack(side="left", padx=5)
+        tk.Button(left_frame, text="Modifier Client", command=self.edit_client).pack(side="left", padx=5)
+        tk.Button(left_frame, text="Supprimer Client", command=self.delete_client).pack(side="left", padx=5)
+        tk.Button(left_frame, text="Détails Client", command=self.open_client_details).pack(side="left", padx=5)
+
+        # Bouton séparé à droite
+        tk.Button(action_frame, text="Gestion des paramètres", command=self.open_parameters).pack(side="right", padx=5)
 
         # Charger la liste initiale
         self.load_clients()

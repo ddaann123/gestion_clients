@@ -105,24 +105,8 @@ class SubmissionSearchWindow:
             data = self.db_manager.charger_soumission(submission_number)
             print(f"[DEBUG] Données chargées : {data}")
             if data:
-                # Archiver la soumission actuelle si on en ouvre une révision
-                self.db_manager.marquer_soumission_inactive(submission_number)
-
-                # Chercher la prochaine révision disponible
-                numero_base = submission_number.split(" ")[0]  # sans le REV
-                with self.db_manager.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT MAX(revision) FROM submissions WHERE submission_number LIKE ?
-                    """, (f"{numero_base}%",))
-                    max_rev = cursor.fetchone()[0] or 0
-                    new_revision = max_rev + 1
-                    data['submission_number'] = f"{numero_base} REV.{new_revision}"
-                    data['revision'] = new_revision
-
                 SubmissionForm(self.window, self.db_manager, existing_submission=data)
             else:
                 messagebox.showerror("Erreur", "Soumission introuvable")
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'ouverture : {e}")
-

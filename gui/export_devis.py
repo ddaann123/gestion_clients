@@ -5,6 +5,8 @@ from datetime import datetime
 import openpyxl
 import os
 import re
+import xlwings as xw
+
 
 class ExportDevisWindow:
     def __init__(self, parent, submission_data, db_manager):
@@ -140,83 +142,14 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
 
 
 
+
+
     def export_to_excel(self):
         try:
-            wb = openpyxl.load_workbook("c:/gestion_clients/models/Devis_PBL.xlsx")
-            ws = wb.active
-
-            ws["B14"] = self.entries["client_name"].get()
-            ws["I18"] = self.entries["projet"].get()
-            ws["B16"] = self.entries["contact"].get()
-
-            contact_nom = self.entries["contact"].get()
-            infos_contact = self.db_manager.get_contact_by_name(contact_nom)
-            if infos_contact:
-                telephone, courriel = infos_contact
-                ws["B18"] = telephone
-                ws["B22"] = courriel
-
-            ws["B34"] = self.submission_data.get("product", "")
-            ws["I14"] = self.submission_data.get("submission_number", "")
-            ws["I16"] = self.submission_data.get("date_submission", datetime.now().strftime("%Y-%m-%d"))
-            ws["F34"] = self.surface_totale_var.get()
-
-            ws["E34"] = self.submission_data.get("thickness", "")
-            ws["J34"] = self.submission_data.get("prix_unitaire", "")
-            ws["E27"] = self.submission_data.get("mobilisations", "")
-            ws["J28"] = self.termes_var.get()
-            if self.repere_var.get():
-                ws["E28"] = "OUI"
-
-            texte = ""
-            for clause, var in self.clause_vars.items():
-                if var.get():
-                    texte += self.clauses_texts[clause]
-            ws["B26"] = texte.strip()
-            
-
-            print(f"[DEBUG] Toutes les clés dans submission_data : {list(self.submission_data.keys())}")
-
-            membrane = self.submission_data.get("membrane", "").strip()
-            print(f"[DEBUG] Nom de membrane brut : {repr(membrane)}")
-
-            if membrane and membrane.upper() != "AUCUNE":
-                print("[DEBUG] Une membrane a été sélectionnée, tentative d’export.")
-                ws["B37"] = membrane
-                ws["B38"] = "   POSE SANS DIVISIONS"
-                ws["B39"] = "   POSE AVEC DIVISIONS"
-                ws["E38"] = "PI²"
-                ws["E39"] = "PI²"
-
-                try:
-                    membrane_data = self.db_manager.get_membrane_by_nom(membrane)
-                    print(f"[DEBUG] Résultat de get_membrane_by_nom : {membrane_data}")
-                    if membrane_data:
-                        prix_rouleau, prix_sans_div, prix_avec_div = membrane_data
-                        total_sans_div = round(prix_rouleau + prix_sans_div, 2)
-                        total_avec_div = round(prix_rouleau + prix_avec_div, 2)
-                        ws["J38"] = total_sans_div
-                        ws["J39"] = total_avec_div
-                        ws["F38"] = ws["F34"].value
-                        ws["F39"] = ws["F34"].value
-
-                except Exception as e:
-                    print(f"[ERREUR] Impossible de récupérer les prix de la membrane : {e}")
-             
-
-
-            if self.marche_var.get():
-                ws["B41"] = "REMPLISSAGE PANNE DE MARCHE"
-                ws["E41"] = self.epaisseur_var.get()
-                ws["F41"] = self.quantite_var.get()
-                ws["I41"] = "UN"
-                ws["J41"] = "18.00"
-
-
-
-
+            chemin_modele = "c:/gestion_clients/models/Devis_PBL.xlsx"
             dossier_export = r"G:\Mon disque\SOUMISSIONS DL"
             os.makedirs(dossier_export, exist_ok=True)
+
             submission = self.submission_data.get("submission_number", "")
             client = self.entries["client_name"].get().upper()
             projet = self.entries["projet"].get().upper()
@@ -228,7 +161,70 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
             nom_fichier = f"{nettoyer(submission)} - {nettoyer(client)} - {nettoyer(projet)} - {nettoyer(date)}.xlsx"
             chemin_export = os.path.join(dossier_export, nom_fichier)
 
+            app = xw.App(visible=False)
+            wb = app.books.open(chemin_modele)
+            ws = wb.sheets[0]
+
+            ws.range("B14").value = self.entries["client_name"].get()
+            ws.range("I18").value = self.entries["projet"].get()
+            ws.range("B16").value = self.entries["contact"].get()
+
+            contact_nom = self.entries["contact"].get()
+            infos_contact = self.db_manager.get_contact_by_name(contact_nom)
+            if infos_contact:
+                telephone, courriel = infos_contact
+                ws.range("B18").value = telephone
+                ws.range("B22").value = courriel
+
+            ws.range("B34").value = self.submission_data.get("product", "")
+            ws.range("I14").value = submission
+            ws.range("I16").value = date
+            ws.range("F34").value = self.surface_totale_var.get()
+            ws.range("E34").value = self.submission_data.get("thickness", "")
+            ws.range("J34").value = self.submission_data.get("prix_unitaire", "")
+            ws.range("E27").value = self.submission_data.get("mobilisations", "")
+            ws.range("J28").value = self.termes_var.get()
+            if self.repere_var.get():
+                ws.range("E28").value = "OUI"
+
+            texte = ""
+            for clause, var in self.clause_vars.items():
+                if var.get():
+                    texte += self.clauses_texts[clause]
+            ws.range("B26").value = texte.strip()
+
+            membrane = self.submission_data.get("membrane", "").strip()
+            if membrane and membrane.upper() != "AUCUNE":
+                ws.range("B37").value = membrane
+                ws.range("B38").value = "   POSE SANS DIVISIONS"
+                ws.range("B39").value = "   POSE AVEC DIVISIONS"
+                ws.range("E38").value = "PI²"
+                ws.range("E39").value = "PI²"
+
+                try:
+                    membrane_data = self.db_manager.get_membrane_by_nom(membrane)
+                    if membrane_data:
+                        prix_rouleau, prix_sans_div, prix_avec_div = membrane_data
+                        total_sans_div = round(prix_rouleau + prix_sans_div, 2)
+                        total_avec_div = round(prix_rouleau + prix_avec_div, 2)
+                        ws.range("J38").value = total_sans_div
+                        ws.range("J39").value = total_avec_div
+                        ws.range("F38").value = ws.range("F34").value
+                        ws.range("F39").value = ws.range("F34").value
+                except Exception as e:
+                    print(f"[ERREUR] Prix membrane : {e}")
+
+            if self.marche_var.get():
+                ws.range("B41").value = "REMPLISSAGE PANNE DE MARCHE"
+                ws.range("E41").value = self.epaisseur_var.get()
+                ws.range("F41").value = self.quantite_var.get()
+                ws.range("I41").value = "UN"
+                ws.range("J41").value = "18.00"
+
             wb.save(chemin_export)
+            wb.close()
+            app.quit()
+
             messagebox.showinfo("Succès", f"Devis exporté à :\n{chemin_export}")
             self.window.destroy()
 

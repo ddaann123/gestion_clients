@@ -27,7 +27,7 @@ class ProjectNotesWindow:
     def __init__(self, parent, notes_data=None):
         self.window = tk.Toplevel(parent)
         self.window.title("Notes de Projet")
-        self.window.geometry("400x500")
+        self.window.geometry("600x600")
         self.window.transient(parent)
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)  # Gestion de la fermeture
         self.window.grab_set()
@@ -285,6 +285,10 @@ class SubmissionForm:
         self.transport_sector_var.trace_add("write", self.update_sable_total)
         self.truck_tonnage_var.trace_add("write", self.update_sable_total)
         self.sable_transporter_var.trace_add("write", self.update_sable_total)
+        self.sealant_total_var.trace_add("write", self.update_sous_total_fournisseurs)
+        self.prix_total_sacs_var.trace_add("write", self.update_sous_total_fournisseurs)
+        self.prix_total_sable_var.trace_add("write", self.update_sous_total_fournisseurs)
+        standard_width = 15 #LARGEUR UNIFORME POUR LES CHAMPS
 
 
 
@@ -302,7 +306,7 @@ class SubmissionForm:
         self.window = tk.Toplevel(parent)
         self.window.title("Nouvelle Soumission")
 
-        self.window.geometry("950x900")  # ← tu peux ajuster ici largeur x hauteur
+        self.window.geometry("1000x900")  # ← tu peux ajuster ici largeur x hauteur
 
 
         # ---- SCROLLBAR CONFIGURATION ----
@@ -380,25 +384,36 @@ class SubmissionForm:
         tk.Button(proj_frame, text="Notes de projet", command=self.open_project_notes).grid(row=0, column=2, padx=5, pady=5)
 
         # Champ Ville
-        tk.Label(proj_frame, text="Ville :").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        tk.Label(proj_frame, text="Adresse-Ville :").grid(row=1, column=0, padx=5, pady=5, sticky="w")
         self.ville_var = tk.StringVar()
-        tk.Entry(proj_frame, textvariable=self.ville_var, width=30).grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        tk.Entry(proj_frame, textvariable=self.ville_var, width=35).grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
         # Champ Distance chantier aller-simple (km) et bouton Calculer
-        tk.Label(proj_frame, text="Distance chantier aller-simple (km) :").grid(row=2, column=0, padx=5, pady=5, sticky="w")
-        tk.Entry(proj_frame, textvariable=self.distance_var, width=10).grid(row=2, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(proj_frame, text="Distance aller-simple (km) :").grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        tk.Entry(proj_frame, textvariable=self.distance_var, width=20, justify="center").grid(row=2, column=1, padx=5, pady=5, sticky="w")
         tk.Button(proj_frame, text="Calculer distance", command=lambda: calculate_distance(self.ville_var.get())).grid(row=2, column=2, padx=5, pady=5)
 
-        # Bouton Surface détaillée
-        tk.Button(proj_frame, text="Surface détaillée", command=self.open_surface_details).grid(row=3, column=1, pady=5)
+        
+        #Section Produits et fournisseurs
+        # Frame pour disposer les champs sur 2 lignes et 2 colonnes
+        surface_frame = tk.Frame(proj_frame)
+        surface_frame.grid(row=3, column=0, columnspan=6, padx=5, pady=5)
 
-        # Champs Surface totale, Nombre de mobilisations, Surface par mob. prévue
-        tk.Label(proj_frame, text="Surface totale (pi²) :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-        tk.Label(proj_frame, textvariable=self.total_surface_var, width=10).grid(row=4, column=1, padx=5, pady=5, sticky="w")
-        tk.Label(proj_frame, text="Nombre de mobilisations :").grid(row=4, column=2, padx=5, pady=5, sticky="e")
-        tk.Entry(proj_frame, textvariable=self.mobilizations_var, width=10).grid(row=4, column=3, padx=5, pady=5, sticky="w")
-        tk.Label(proj_frame, text="Surface par mob. prévue :").grid(row=4, column=4, padx=5, pady=5, sticky="e")
-        tk.Label(proj_frame, textvariable=self.surface_per_mob_var, width=10).grid(row=4, column=5, padx=5, pady=5, sticky="w")
+        # Ligne 1 : Surface détaillée à gauche, Surface totale à droite
+        tk.Button(surface_frame, text="Surface détaillée par étage", command=self.open_surface_details).grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        tk.Label(surface_frame, text="Surface totale (pi²) :").grid(row=0, column=2, sticky="e", padx=5, pady=5)
+        tk.Label(surface_frame, textvariable=self.total_surface_var, width=12, relief="solid", borderwidth=1).grid(row=0, column=3, sticky="w", padx=5, pady=5)
+
+        # Ligne 2 : Nombre de mobilisations à gauche, Surface par mob. prévue à droite
+        tk.Label(surface_frame, text="Nombre de mobilisations :").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        tk.Entry(surface_frame, textvariable=self.mobilizations_var, width=10, justify="center").grid(row=1, column=1, sticky="w", padx=5, pady=5)
+
+        tk.Label(surface_frame, text="Surface par mob. prévue :").grid(row=1, column=2, sticky="e", padx=5, pady=5)
+        tk.Label(surface_frame, textvariable=self.surface_per_mob_var, width=12, relief="solid", borderwidth=1).grid(row=1, column=3, sticky="w", padx=5, pady=5)
+
+
+
+
 
         # Ajouter le trace pour mobilizations_var
         self.mobilizations_var.trace("w", self.update_surface_per_mob)
@@ -409,7 +424,7 @@ class SubmissionForm:
 
         # Champ Superficie (pi²)
         tk.Label(calc_frame, text="Superficie (pi²) :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
-        entry_superficie = tk.Entry(calc_frame, textvariable=self.area_var, width=10)
+        entry_superficie = tk.Entry(calc_frame, textvariable=self.area_var, width=standard_width, justify="center")
         entry_superficie.grid(row=0, column=1, padx=5, pady=5, sticky="w")
         self.area_var.trace("w", lambda *args: valider_entree_numerique(entry_superficie, self.area_var.get(), "Superficie (pi²)"))
 
@@ -417,14 +432,28 @@ class SubmissionForm:
 
         # Champ Produit
         tk.Label(calc_frame, text="Produit :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+
+        # Récupération des produits
         details = self.db_manager.get_produit_details()
-        self.products = [(d[0], d) for d in details]  # Inclure tous les produits
-        self.product_menu = tk.OptionMenu(calc_frame, self.product_var, *tuple(p[0] for p in self.products))
+        self.products = [(d[0], d) for d in details]  # d[0] = nom du produit
+
+        # Initialisation de la variable de sélection
+        self.product_var = tk.StringVar()
+
+        # ✅ Sélection du premier produit par défaut, s’il existe
+        if self.products:
+            self.product_var.set(self.products[0][0])  # Définit le premier nom de produit
+
+        # Création du menu déroulant avec texte aligné à gauche
+        self.product_menu = tk.OptionMenu(calc_frame, self.product_var, *[p[0] for p in self.products])
+        self.product_menu.config(width=standard_width, anchor="w")  # 👈 Texte aligné à gauche
         self.product_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+
 
         # Champ Ratio
         tk.Label(calc_frame, text="Ratio :").grid(row=0, column=4, padx=5, pady=5, sticky="e")
         self.ratio_menu = tk.OptionMenu(calc_frame, self.ratio_var, "")
+        self.ratio_menu.config(width=standard_width)
         self.ratio_menu.grid(row=0, column=5, padx=5, pady=5, sticky="w")
         self.ratio_menu.config(state="disabled")
         self.update_ratio_options()
@@ -435,28 +464,32 @@ class SubmissionForm:
         # Récupérer les modèles de membrane depuis la base de données
         membrane_options = ["Aucune"] + [row[1] for row in self.db_manager.get_membranes()]  # Ajoute "Aucune" comme première option
         self.membrane_menu = tk.OptionMenu(calc_frame, self.membrane_var, *membrane_options)
+        self.membrane_menu.config(width=standard_width)
         self.membrane_menu.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
         # Nouveau champ Pose membrane
         tk.Label(calc_frame, text="Pose membrane :").grid(row=2, column=2, padx=5, pady=5, sticky="e")
         self.pose_membrane_menu = tk.OptionMenu(calc_frame, self.pose_membrane_var, *POSE_MEMBRANE_OPTIONS)
+        self.pose_membrane_menu.config(width=standard_width)
         self.pose_membrane_menu.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
         
         # Champ Taux de change USD/CAD
         tk.Label(calc_frame, text="Taux de change USD/CAD :").grid(row=1, column=0, padx=5, pady=5, sticky="e")
         self.usd_cad_rate_var = tk.StringVar(value=str(DEFAULT_USD_CAD_RATE))
-        tk.Entry(calc_frame, textvariable=self.usd_cad_rate_var, width=10).grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        tk.Entry(calc_frame, textvariable=self.usd_cad_rate_var, width=standard_width, justify="center").grid(row=1, column=1, padx=5, pady=5, sticky="w")
         self.usd_cad_rate_var.trace("w", self.update_prix_par_sac)  # 🔁 observe changement taux de change
 
         # Champ Épaisseur
         tk.Label(calc_frame, text="Épaisseur :").grid(row=1, column=2, padx=5, pady=5, sticky="e")
         self.thickness_menu = tk.OptionMenu(calc_frame, self.thickness_var, *THICKNESS_OPTIONS)
+        self.thickness_menu.config(width=standard_width)
         self.thickness_menu.grid(row=1, column=3, padx=5, pady=5, sticky="w")
 
         # Champ Type de sous-plancher
         tk.Label(calc_frame, text="Type de sous-plancher :").grid(row=1, column=4, padx=5, pady=5, sticky="e")
         self.subfloor_menu = tk.OptionMenu(calc_frame, self.subfloor_var, *SUBFLOOR_OPTIONS)
+        self.subfloor_menu.config(width=standard_width)
         self.subfloor_menu.grid(row=1, column=5, padx=5, pady=5, sticky="w")
         self.subfloor_var.set(DEFAULT_SUBFLOOR)  # Définir la valeur par défaut
 
@@ -466,17 +499,20 @@ class SubmissionForm:
         sable_data = self.db_manager.get_sable()
         transporters = sorted(set(row[1] for row in sable_data))  # Colonne 1 est transporteur
         self.sable_transporter_menu = tk.OptionMenu(calc_frame, self.sable_transporter_var, *transporters)
+        self.sable_transporter_menu.config(width=standard_width)
         self.sable_transporter_menu.grid(row=3, column=1, padx=5, pady=5, sticky="w")
         self.sable_transporter_var.trace("w", self.update_truck_tonnage_options)  # Mettre à jour le tonnage dynamiquement
 
         # Champ Tonnage camion (tm)
         tk.Label(calc_frame, text="Tonnage camion (tm) :").grid(row=3, column=2, padx=5, pady=5, sticky="e")
         self.truck_tonnage_menu = tk.OptionMenu(calc_frame, self.truck_tonnage_var, "")
+        self.truck_tonnage_menu.config(width=standard_width)
         self.truck_tonnage_menu.grid(row=3, column=3, padx=5, pady=5, sticky="w")
 
         # Champ Secteur de transport
         tk.Label(calc_frame, text="Secteur de transport :").grid(row=3, column=4, padx=5, pady=5, sticky="e")
         self.transport_sector_menu = tk.OptionMenu(calc_frame, self.transport_sector_var, "")
+        self.transport_sector_menu.config(width=standard_width)
         self.transport_sector_menu.grid(row=3, column=5, padx=5, pady=5, sticky="w")
 
         # Nouveau champ Travaux en dégel
@@ -484,47 +520,66 @@ class SubmissionForm:
         self.thaw_work_check = tk.Checkbutton(calc_frame, variable=self.thaw_work_var)
         self.thaw_work_check.grid(row=4, column=1, padx=5, pady=5, sticky="w")
 
-        # Nouvelle section Produits et Fournisseurs
-        prod_frame = ttk.LabelFrame(self.main_frame, text="PRODUITS ET FOURNISSEURS", padding=10)
-        prod_frame.pack(padx=10, pady=10, fill="both", expand=True)
+        # Enveloppe pour la section Produits et Fournisseurs
+        prod_frame_wrapper = tk.Frame(self.main_frame)
+        prod_frame_wrapper.pack(fill="x", padx=10, pady=10)
+
+        # Frame de contenu avec bordure
+        prod_frame = ttk.LabelFrame(prod_frame_wrapper, text="PRODUITS ET FOURNISSEURS", padding=10)
+        prod_frame.pack(fill="x", expand=True)
+
+        # Configurer les colonnes
+        for i in range(6):
+            prod_frame.grid_columnconfigure(i, weight=1)
+
 
         # Champ Apprets et scellants
         tk.Label(prod_frame, text="Apprets et scellants :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
         sealant_data = self.db_manager.get_apprets_scellants()
         sealant_options = ["Aucun"] + sorted(set(row[1] for row in sealant_data))  # Colonne 1 est nom_produit
         self.sealant_menu = tk.OptionMenu(prod_frame, self.sealant_var, *sealant_options)
+        self.sealant_menu.config(width=standard_width)
         self.sealant_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
-        tk.Label(prod_frame, text="Total scellants et apprêts ($) :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
-        tk.Label(prod_frame, textvariable=self.sealant_total_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(prod_frame, text="Total scellants et apprêts ($) :").grid(row=0, column=3, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.sealant_total_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=0, column=4, padx=5, pady=5, sticky="w")
 
         tk.Label(prod_frame, text="Prix par sac ($) :").grid(row=1, column=0, padx=5, pady=5, sticky="e")
-        tk.Label(prod_frame, textvariable=self.prix_par_sac_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(prod_frame, textvariable=self.prix_par_sac_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
-        # Champ Quantité totale de sacs
         tk.Label(prod_frame, text="Quantité totale de sacs :").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-        tk.Label(prod_frame, textvariable=self.total_sacs_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=2, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(prod_frame, textvariable=self.total_sacs_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
         tk.Label(prod_frame, text="Quantité totale de sable (tm) :").grid(row=3, column=0, padx=5, pady=5, sticky="e")
-        tk.Label(prod_frame, textvariable=self.sable_total_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=3, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(prod_frame, textvariable=self.sable_total_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
         tk.Label(prod_frame, text="Nombre voyage de sable :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-        tk.Label(prod_frame, textvariable=self.nombre_voyages_var, width=10, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(prod_frame, textvariable=self.nombre_voyages_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=1, padx=5, pady=5, sticky="w")
 
-        tk.Label(prod_frame, text="Prix total sable ($) :").grid(row=4, column=2, padx=5, pady=5, sticky="e")
-        tk.Label(prod_frame, textvariable=self.prix_total_sable_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(prod_frame, text="Prix total sable ($) :").grid(row=4, column=3, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.prix_total_sable_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=4, padx=5, pady=5, sticky="w")
 
-        # Champ Prix total sacs
-        tk.Label(prod_frame, text="Prix total sacs ($) :").grid(row=2, column=2, padx=5, pady=5, sticky="e")
-        tk.Label(prod_frame, textvariable=self.prix_total_sacs_var, relief="solid", width=12, borderwidth=1).grid(row=2, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(prod_frame, text="Prix total sacs ($) :").grid(row=2, column=3, padx=5, pady=5, sticky="e")
+        tk.Label(prod_frame, textvariable=self.prix_total_sacs_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=2, column=4, padx=5, pady=5, sticky="w")
 
-
+    
+    
+    
+    
         # Nouvelle section Main d’œuvre et machinerie
-        main_frame = ttk.LabelFrame(self.main_frame, text="MAIN D'OEUVRE ET MACHINERIE", padding=10)
-        main_frame.pack(padx=10, pady=10, fill="both", expand=True)
+        main_frame_wrapper = tk.Frame(self.main_frame)
+        main_frame_wrapper.pack(fill="x", padx=10, pady=10)
+
+        main_frame = ttk.LabelFrame(main_frame_wrapper, text="MAIN D'OEUVRE ET MACHINERIE", padding=10)
+        main_frame.pack(fill="x", expand=True)
+
+        # Définir les colonnes pour permettre un bon alignement
+        for i in range(6):  # Ajuste à ton besoin
+            main_frame.grid_columnconfigure(i, weight=1)
+
 
         # Champ Type de main d’œuvre
-        tk.Label(main_frame, text="Type de main d’œuvre :").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, text="Type de main d’œuvre :", width=20).grid(row=0, column=0, padx=5, pady=5, sticky="e")
 
         main_doeuvre_data = self.db_manager.get_main_doeuvre()
         metiers = [row[1] for row in main_doeuvre_data]  # Colonne 1 = metier
@@ -537,6 +592,7 @@ class SubmissionForm:
         
 
         self.main_doeuvre_menu = tk.OptionMenu(main_frame, self.type_main_var, *metiers)
+        self.main_doeuvre_menu.config(width=standard_width, anchor="w")
         self.main_doeuvre_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
 
@@ -549,7 +605,7 @@ class SubmissionForm:
 
 
         # Champ Type de pension
-        tk.Label(main_frame, text="Type de pension :").grid(row=0, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, text="Type de pension :", width=standard_width).grid(row=0, column=3, padx=5, pady=5, sticky="e")
 
         pension_data = self.db_manager.get_pensions()
         types_pension = [row[1] for row in pension_data]
@@ -559,14 +615,15 @@ class SubmissionForm:
         self.update_prix_total_pension()
        
         self.pension_menu = tk.OptionMenu(main_frame, self.type_pension_var, *types_pension)
-        self.pension_menu.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        self.pension_menu.config(width=standard_width)
+        self.pension_menu.grid(row=0, column=4, padx=5, pady=5, sticky="w")
         self.champs["Type de pension"] = self.type_pension_var
 
 
 
 
         # Champ Type de machinerie
-        tk.Label(main_frame, text="Type de machinerie :").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, text="Type de machinerie :", width=standard_width).grid(row=1, column=0, padx=5, pady=5, sticky="e")
 
         machinerie_data = self.db_manager.get_machinerie()
         types_machinerie = [row[1] for row in machinerie_data]  # Colonne 1 = type_machinerie
@@ -583,30 +640,31 @@ class SubmissionForm:
 
 
         self.type_machinerie_menu = tk.OptionMenu(main_frame, self.type_machinerie_var, *types_machinerie)
+        self.type_machinerie_menu.config(width=standard_width, anchor="w")
         self.type_machinerie_menu.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
         # Ajouter au dictionnaire des champs
         self.champs["Type machinerie"] = self.type_machinerie_var
 
         # Champ Prix total machinerie
-        tk.Label(main_frame, text="Prix total machinerie ($) :").grid(row=1, column=2, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, text="Prix total machinerie ($) :", width=20).grid(row=1, column=3, padx=5, pady=5, sticky="e")
         self.prix_total_machinerie_var = tk.StringVar(value="0.00")
-        tk.Label(main_frame, textvariable=self.prix_total_machinerie_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=1, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(main_frame, textvariable=self.prix_total_machinerie_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=1, column=4, padx=5, pady=5, sticky="w")
 
 
 
 
         # Champ Nombre d'hommes
-        tk.Label(main_frame, text="Nombre d'hommes :").grid(row=2, column=0, padx=5, pady=5, sticky="e")
-        entry_nombre_hommes = tk.Entry(main_frame, textvariable=self.nombre_hommes_var, justify='center', width=10)
+        tk.Label(main_frame, text="Nombre d'hommes :", width=standard_width).grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        entry_nombre_hommes = tk.Entry(main_frame, textvariable=self.nombre_hommes_var, justify='center', width=standard_width)
         entry_nombre_hommes.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
 
         # Champ Prix total pension
 
 
-        tk.Label(main_frame, text="Prix total pension ($) :").grid(row=2, column=2, padx=5, pady=5, sticky="e")
-        tk.Label(main_frame, textvariable=self.prix_total_pension_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=2, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(main_frame, text="Prix total pension ($) :", width=standard_width).grid(row=2, column=3, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, textvariable=self.prix_total_pension_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=2, column=4, padx=5, pady=5, sticky="w")
 
 
 
@@ -614,8 +672,8 @@ class SubmissionForm:
         self.champs["Nombre d'hommes"] = self.nombre_hommes_var
 
         # Champ Heures chantier calculées
-        tk.Label(main_frame, text="Heures chantier calculées :").grid(row=3, column=0, padx=5, pady=5, sticky="e")
-        entry_heures_chantier = tk.Entry(main_frame, textvariable=self.heures_chantier_var, justify='center', width=10)
+        tk.Label(main_frame, text="Heures chantier calculées :", width=20).grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        entry_heures_chantier = tk.Entry(main_frame, textvariable=self.heures_chantier_var, justify='center', width=standard_width)
         entry_heures_chantier.grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
         # Ajouter au dictionnaire des champs si besoin
@@ -623,20 +681,20 @@ class SubmissionForm:
 
 
         #Champ Prix total heures chantier
-        tk.Label(main_frame, text="Prix total heures chantier ($) :").grid(row=3, column=2, padx=5, pady=5, sticky="e")
-        tk.Label(main_frame, textvariable=self.prix_total_heures_chantier_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=3, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(main_frame, text="Prix total heures chantier ($) :", width=22).grid(row=3, column=3, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, textvariable=self.prix_total_heures_chantier_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=3, column=4, padx=5, pady=5, sticky="w")
 
 
 
         # Champ Heures transport calculées
-        tk.Label(main_frame, text="Heures transport calculées :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-        entry_heures_transport = tk.Entry(main_frame, textvariable=self.heures_transport_var, justify='center', width=10)
+        tk.Label(main_frame, text="Heures transport calculées :", width=20).grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        entry_heures_transport = tk.Entry(main_frame, textvariable=self.heures_transport_var, justify='center', width=standard_width)
         entry_heures_transport.grid(row=4, column=1, padx=5, pady=5, sticky="w")
         self.champs["Heures transport calculées"] = self.heures_transport_var
 
         # Champ Prix total heures transport
-        tk.Label(main_frame, text="Prix total heures transport ($) :").grid(row=4, column=2, padx=5, pady=5, sticky="e")
-        tk.Label(main_frame, textvariable=self.prix_total_heures_transport_var, width=12, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=3, padx=5, pady=5, sticky="w")
+        tk.Label(main_frame, text="Prix total heures transport ($) :", width=22).grid(row=4, column=3, padx=5, pady=5, sticky="e")
+        tk.Label(main_frame, textvariable=self.prix_total_heures_transport_var, width=standard_width, relief="solid", borderwidth=1, anchor="center").grid(row=4, column=4, padx=5, pady=5, sticky="w")
 
 
 
@@ -669,7 +727,7 @@ class SubmissionForm:
 
         # Repères de nivellement
         tk.Label(ajustements_frame, text="Repères de nivellement :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-        entry_reperes = tk.Entry(ajustements_frame, textvariable=self.reperes_var, width=12, justify='right')
+        entry_reperes = tk.Entry(ajustements_frame, textvariable=self.reperes_var, width=15, justify='center')
         entry_reperes.grid(row=4, column=1, padx=5, pady=5, sticky="w")
 
         # Sous-total ajustements (non modifiable)
@@ -980,9 +1038,9 @@ class SubmissionForm:
 
     def update_sous_total_fournisseurs(self, *args):
         try:
-            sealant_total = float(self.sealant_total_var.get().replace(",", ".") or 0)
-            total_sacs = float(self.prix_total_sacs_var.get().replace(",", ".") or 0)
-            total_sable = float(self.prix_total_sable_var.get().replace(",", ".") or 0)
+            sealant_total = safe_float(self.sealant_total_var.get())
+            total_sacs = safe_float(self.prix_total_sacs_var.get())
+            total_sable = safe_float(self.prix_total_sable_var.get())
 
             total = sealant_total + total_sacs + total_sable
             self.sous_total_fournisseurs_var.set(f"{total:.2f} $")
@@ -991,6 +1049,7 @@ class SubmissionForm:
             self.sous_total_fournisseurs_var.set("Erreur")
 
         self.update_total_prix_coutants()
+
 
 
 
