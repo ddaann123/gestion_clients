@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Feuilles de travail - Chantier</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: auto; 
+            padding: 20px; 
+        }
+        h2 { 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        .logo {
+            display: block;
+            max-width: 200px; /* Ajuste la taille maximale du logo */
+            margin: 0 auto 20px auto; /* Centre le logo avec une marge en bas */
+        }
+        .tabs { 
+            display: flex; 
+            flex-wrap: wrap; 
+            margin-bottom: 20px; 
+            gap: 10px; 
+        }
+        .tab-button {
+            padding: 8px 12px;
+            background-color: #ddd;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .tab-button.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        form { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
+        }
+        .form-row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            font-size: 1em;
+        }
+        textarea {
+            resize: vertical;
+        }
+        button.submit {
+            padding: 10px 20px;
+            background-color: #3498db;
+            border: none;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button.submit:hover {
+            background-color: #2980b9;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        table th, table td {
+            border: 1px solid #ccc;
+            padding: 4px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+        table th {
+            background-color: #f2f2f2;
+            white-space: nowrap;
+        }
+        table select, table input {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        input[type="checkbox"] {
+            transform: scale(1.2);
+        }
+        table.heure-chantier th {
+            white-space: normal;
+            word-wrap: break-word;
+            text-align: center;
+            font-size: 13px;
+            padding: 4px;
+        }
+        table.heure-chantier td {
+            text-align: center;
+            vertical-align: middle;
+        }
+        input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            display: inline-block;
+            position: relative;
+            background: white;
+            margin: auto;
+        }
+        input[type="checkbox"]:checked::after {
+            content: "✔";
+            font-size: 14px;
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <img src="/static/logo.png" alt="Logo de la compagnie" class="logo">
+    <h2>Feuilles de travail - Chantier</h2>
+
+    <div class="tabs" id="tab-buttons">
+        <!-- Onglets générés dynamiquement -->
+    </div>
+
+    <div id="tab-contents">
+        <!-- Contenu injecté dynamiquement -->
+    </div>
+
+    <script>
+        // Objet pour suivre si une copie a été effectuée pour chaque type de champ par onglet
+        const copyStatus = {};
+
+        function showTab(dateId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById(dateId).classList.add('active');
+            document.querySelector(`[data-tab='${dateId}']`).classList.add('active');
+        }
+
+        function remplirMenusDeroulants() {
+            // Options pour Heure début / Heure fin (2:00 à 23:45)
+            const heureOptions = [];
+            for (let h = 2; h < 24; h++) {
+                for (let m of [0, 15, 30, 45]) {
+                    const label = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                    heureOptions.push(label);
+                }
+            }
+
+            // Options pour Temps transport / Heures entrepôt (0:00 à 12:00 par pas de 15 min)
+            const transportOptions = ['0:00'];
+            for (let total = 15; total <= 720; total += 15) {
+                const heures = Math.floor(total / 60);
+                const minutes = total % 60;
+                const label = `${heures}:${minutes.toString().padStart(2, '0')}`;
+                transportOptions.push(label);
+            }
+
+            // Injection dans les menus
+            document.querySelectorAll("select.heure-select").forEach(select => {
+                select.innerHTML = '<option value="">--</option>' + 
+                    heureOptions.map(opt => `<option value="${opt}">${opt}</option>`).join("");
+            });
+
+            document.querySelectorAll("select.transport-select").forEach(select => {
+                select.innerHTML = '<option value="0:00" selected>0:00</option>' + 
+                    transportOptions.map(opt => `<option value="${opt}">${opt}</option>`).join("");
+            });
+        }
+
+        function copyValues(sourceSelect, fieldType, tabId) {
+            // Vérifier si une copie a déjà été effectuée pour ce type de champ dans cet onglet
+            if (!copyStatus[tabId]) {
+                copyStatus[tabId] = {};
+            }
+            if (copyStatus[tabId][fieldType]) {
+                return; // Ne pas recopier si une copie a déjà été faite
+            }
+
+            const selectedValue = sourceSelect.value;
+            const tabContent = sourceSelect.closest('.tab-content');
+            const rows = tabContent.querySelectorAll('.heure-chantier tr');
+            rows.forEach(row => {
+                const presenceCheckbox = row.querySelector('input[name^="presence_"]');
+                if (presenceCheckbox && presenceCheckbox.checked) {
+                    const targetSelect = row.querySelector(`select[name^="${fieldType}_"]`);
+                    if (targetSelect && targetSelect !== sourceSelect) {
+                        targetSelect.value = selectedValue;
+                    }
+                }
+            });
+
+            // Marquer ce type de champ comme copié pour cet onglet
+            copyStatus[tabId][fieldType] = true;
+        }
+
+        function validateForm(form) {
+            const errors = [];
+
+            // Valider les champs en jaune
+            const sacsUtilises = form.querySelector('input[name="sacs_utilises"]').value;
+            if (!sacsUtilises.trim()) {
+                errors.push("Le champ 'Sacs utilisés' doit être rempli.");
+            }
+
+            const sableUtilise = form.querySelector('input[name="sable_utilise"]').value;
+            if (sableUtilise.trim() === "") {
+                errors.push("Le champ 'Surplus de sable' doit être rempli (0 accepté).");
+            }
+
+            const nbRouleaux = form.querySelector('input[name="nb_rouleaux"]').value || "";
+            const membranePosee = form.querySelector('select[name="membrane_posee"]').value;
+            const nbRouleauxInstalles = form.querySelector('input[name="nb_rouleaux_installes"]').value;
+            console.log("Valeur de nb_rouleaux :", nbRouleaux, "Type :", typeof nbRouleaux, "Est non vide :", !!nbRouleaux.trim()); // Débogage
+            if (nbRouleaux.trim()) {
+                if (!membranePosee) {
+                    errors.push("Le champ 'Installation membrane' doit être sélectionné si 'Nombre de rouleaux prévus' est non vide.");
+                }
+                if (!nbRouleauxInstalles.trim()) {
+                    errors.push("Le champ 'Nombre de rouleaux installés' doit être rempli si 'Nombre de rouleaux prévus' est non vide.");
+                }
+            }
+
+            const marchesTheorique = form.querySelector('input[name="marches_theorique"]').value;
+            const marchesReel = form.querySelector('input[name="marches_reel"]').value;
+            if (marchesTheorique.trim() && !marchesReel.trim()) {
+                errors.push("Le champ 'Marche à remplir réel' doit être rempli si 'Marche à remplir théorique' est présent (0 accepté).");
+            }
+
+            // Validation de l'adresse
+            const adresseReel = form.querySelector('input[name="adresse_reel"]').value;
+            if (!adresseReel.trim()) {
+                errors.push("Le champ 'Adresse' doit être rempli.");
+            }
+
+            // Validation du tableau Heures chantier
+            let hasValidEmployee = false;
+            const rows = form.querySelectorAll('.heure-chantier tr');
+            rows.forEach((row, index) => {
+                const presenceCheckbox = row.querySelector('input[name^="presence_"]');
+                const presenceName = presenceCheckbox?.getAttribute('name') || 'non trouvé';
+                const presence = presenceCheckbox?.checked || false;
+                const nomInput = row.querySelector('input[name^="nom_custom_"]');
+                const nom = nomInput?.value || row.cells[0].textContent || `Employé ${index + 1}`;
+                console.log(`Ligne ${index + 1} (${nom}): Name du champ Présence =`, presenceName, "Présence =", presence); // Débogage
+                if (presence) {
+                    const vehiculeSelect = row.querySelector('select[name^="vehicule_"]');
+                    const heureDebutSelect = row.querySelector('select[name^="heure_debut_"]');
+                    const heureFinSelect = row.querySelector('select[name^="heure_fin_"]');
+                    const tempsTransportSelect = row.querySelector('select[name^="temps_transport_"]');
+                    const vehiculeName = vehiculeSelect?.getAttribute('name') || 'non trouvé';
+                    const heureDebutName = heureDebutSelect?.getAttribute('name') || 'non trouvé';
+                    const heureFinName = heureFinSelect?.getAttribute('name') || 'non trouvé';
+                    const tempsTransportName = tempsTransportSelect?.getAttribute('name') || 'non trouvé';
+                    const vehicule = vehiculeSelect?.value || "";
+                    const heureDebut = heureDebutSelect?.value || "";
+                    const heureFin = heureFinSelect?.value || "";
+                    const tempsTransport = tempsTransportSelect?.value || "";
+                    console.log(`Ligne ${index + 1} (${nom}): Véhicule (name=${vehiculeName}) =`, vehicule, 
+                                `Heure début (name=${heureDebutName}) =`, heureDebut, 
+                                `Heure fin (name=${heureFinName}) =`, heureFin, 
+                                `Temps transport (name=${tempsTransportName}) =`, tempsTransport); // Débogage
+                    if (vehicule === "") {
+                        errors.push(`Ligne ${index + 1} (${nom}): Le champ 'Véhicule' doit être sélectionné pour l'employé présent.`);
+                    }
+                    if (heureDebut === "") {
+                        errors.push(`Ligne ${index + 1} (${nom}): Le champ 'Heure début' doit être sélectionné pour l'employé présent.`);
+                    }
+                    if (heureFin === "") {
+                        errors.push(`Ligne ${index + 1} (${nom}): Le champ 'Heure fin' doit être sélectionné pour l'employé présent.`);
+                    }
+                    if (tempsTransport === "") {
+                        errors.push(`Ligne ${index + 1} (${nom}): Le champ 'Temps transport' doit être sélectionné pour l'employé présent.`);
+                    }
+                    if (vehicule !== "" && heureDebut !== "" && heureFin !== "" && tempsTransport !== "") {
+                        hasValidEmployee = true;
+                        console.log(`Ligne ${index + 1} (${nom}): Employé valide`);
+                    }
+                }
+            });
+
+            if (!hasValidEmployee) {
+                errors.push("Au moins un employé doit être marqué comme présent avec 'Véhicule', 'Heure début', 'Heure fin' et 'Temps transport' remplis.");
+            }
+
+            if (errors.length > 0) {
+                Swal.fire({
+                    title: 'Erreur(s) dans le formulaire',
+                    html: errors.join('<br>'),
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+                return false;
+            }
+            return true;
+        }
+
+        fetch("/static/formulaires.json")
+            .then(res => res.json())
+            .then(data => {
+                const tabButtons = document.getElementById("tab-buttons");
+                const tabContents = document.getElementById("tab-contents");
+
+                data.forEach((formulaire, index) => {
+                    const dateId = formulaire.date_travaux || `formulaire-${index}`;
+
+                    const btn = document.createElement("button");
+                    btn.className = "tab-button" + (index === 0 ? " active" : "");
+                    btn.textContent = dateId;
+                    btn.dataset.tab = dateId;
+                    btn.onclick = () => showTab(dateId);
+                    tabButtons.appendChild(btn);
+
+                    const div = document.createElement("div");
+                    div.className = "tab-content" + (index === 0 ? " active" : "");
+                    div.id = dateId;
+                    div.innerHTML = formulaire.html;
+                    tabContents.appendChild(div);
+                });
+
+                // Remplir les menus après injection
+                remplirMenusDeroulants();
+
+                // Attacher les événements pour la copie des valeurs et la soumission
+                document.querySelectorAll('.tab-content').forEach(tab => {
+                    const tabId = tab.id;
+                    const heureDebutSelects = tab.querySelectorAll('select[name^="heure_debut_"]');
+                    const heureFinSelects = tab.querySelectorAll('select[name^="heure_fin_"]');
+                    const tempsTransportSelects = tab.querySelectorAll('select[name^="temps_transport_"]');
+                    const heuresEntrepotSelects = tab.querySelectorAll('select[name^="heures_entrepot_"]');
+
+                    heureDebutSelects.forEach(select => {
+                        select.addEventListener('change', () => copyValues(select, 'heure_debut', tabId));
+                    });
+                    heureFinSelects.forEach(select => {
+                        select.addEventListener('change', () => copyValues(select, 'heure_fin', tabId));
+                    });
+                    tempsTransportSelects.forEach(select => {
+                        select.addEventListener('change', () => copyValues(select, 'temps_transport', tabId));
+                    });
+                    heuresEntrepotSelects.forEach(select => {
+                        select.addEventListener('change', () => copyValues(select, 'heures_entrepot', tabId));
+                    });
+
+                    // Attacher la validation et la confirmation de soumission
+                    const form = tab.querySelector('form');
+                    form.addEventListener('submit', (event) => {
+                        event.preventDefault(); // Empêcher la soumission par défaut
+                        if (!validateForm(form)) {
+                            return; // Bloquer si la validation échoue
+                        }
+                        Swal.fire({
+                            title: 'Confirmer la soumission',
+                            text: 'Voulez-vous soumettre le formulaire actuel ? Assurez-vous que tous les champs sont complétés.',
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Oui, soumettre',
+                            cancelButtonText: 'Annuler'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                const formData = new FormData(form);
+                                fetch('/submit', {
+                                    method: 'POST',
+                                    body: formData
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        Swal.fire({
+                                            title: 'Succès',
+                                            text: 'Les données ont été soumises correctement.',
+                                            icon: 'success',
+                                            confirmButtonText: 'OK'
+                                        }).then(() => {
+                                            window.location.href = '/'; // Rediriger après le message
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            title: 'Erreur',
+                                            text: 'Erreur lors de la soumission : ' + data.error,
+                                            icon: 'error',
+                                            confirmButtonText: 'OK'
+                                        });
+                                    }
+                                })
+                                .catch(error => {
+                                    Swal.fire({
+                                        title: 'Erreur',
+                                        text: 'Erreur lors de la soumission : ' + error,
+                                        icon: 'error',
+                                        confirmButtonText: 'OK'
+                                    });
+                                });
+                            }
+                        });
+                    });
+                });
+            });
+    </script>
+</body>
+</html>

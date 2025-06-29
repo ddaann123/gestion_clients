@@ -35,21 +35,34 @@ def calculate_prix_par_sac(product_name, usd_cad_rate, db_manager):
     Formule : (prix_base + prix_transport), converti en CAD si nécessaire.
     """
     try:
+        print(f"[DEBUG] Produit reçu : {product_name}")
+        print(f"[DEBUG] Taux USD/CAD reçu : {usd_cad_rate}")
         usd_cad_rate = float(usd_cad_rate)
         produits = db_manager.get_produit_details()
         produit = next((p for p in produits if p[0] == product_name), None)
+        print(f"[DEBUG] Produit trouvé : {produit}")
         if not produit:
+            print("[ERREUR] Produit introuvable dans la base de données.")
             return "0.00"
 
         nom, prix_base, devise_base, prix_transport, devise_transport, _, _ = produit
+
+        
+        print(f"[DEBUG] Prix de base : {prix_base} {devise_base}")
+        print(f"[DEBUG] Prix de transport : {prix_transport} {devise_transport}")
 
         # Conversion en CAD
         prix_base_cad = prix_base * usd_cad_rate if devise_base == "USD" else prix_base
         prix_transport_cad = prix_transport * usd_cad_rate if devise_transport == "USD" else prix_transport
 
+        print(f"[DEBUG] Prix base converti CAD : {prix_base_cad}")
+        print(f"[DEBUG] Prix transport converti CAD : {prix_transport_cad}")
+
         total = prix_base_cad + prix_transport_cad
+        print(f"[DEBUG] Prix total par sac : {total:.2f}")
         return f"{total:.2f}"
     except Exception:
+        print(f"[ERREUR] Exception dans calculate_prix_par_sac : {e}")
         return "Erreur"
 
 

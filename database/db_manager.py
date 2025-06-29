@@ -13,7 +13,6 @@ class DatabaseManager:
         init_database(self.db_path)
         print(f"[DEBUG] Base de données utilisée : {self.db_path}")
 
-    
     @contextmanager
     def get_connection(self):
         conn = sqlite3.connect(self.db_path)
@@ -21,29 +20,26 @@ class DatabaseManager:
             yield conn
         finally:
             conn.close()
-    
+
     def get_cursor(self):
         conn = sqlite3.connect(self.db_path)
         return conn, conn.cursor()
-    
+
     def close(self):
         pass
-    
+
     def get_produits(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT nom FROM produits")
             return [row[0] for row in cursor.fetchall()]
-    
+
     def get_sable(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, transporteur, camion, ville, prix_voyage, prix_sable FROM sable")
             return cursor.fetchall()
-            print(f"[DEBUG] Résultats table sable : {results}")
-            return results
 
-    
     def add_sable(self, transporteur, camion, ville, prix_voyage, prix_sable):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -52,7 +48,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?, ?)
             """, (transporteur, camion, ville, prix_voyage, prix_sable))
             conn.commit()
-    
+
     def update_sable(self, sable_id, transporteur, camion, ville, prix_voyage, prix_sable):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -61,7 +57,7 @@ class DatabaseManager:
                 WHERE id = ?
             """, (transporteur, camion, ville, prix_voyage, prix_sable, sable_id))
             conn.commit()
-    
+
     def delete_sable(self, sable_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -79,7 +75,7 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("SELECT id, nom, courriel, telephone, adresse FROM clients WHERE nom LIKE ?", (f"%{query}%",))
             return cursor.fetchall()
-    
+
     def add_client(self, nom, courriel="", telephone="", adresse=""):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -88,7 +84,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?)
             """, (nom, courriel, telephone, adresse))
             conn.commit()
-    
+
     def update_client(self, client_id, nom, courriel, telephone, adresse):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -97,19 +93,19 @@ class DatabaseManager:
                 WHERE id = ?
             """, (nom, courriel, telephone, adresse, client_id))
             conn.commit()
-    
+
     def delete_client(self, client_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM clients WHERE id = ?", (client_id,))
             conn.commit()
-    
+
     def get_contacts(self, client_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, nom, telephone, courriel FROM contacts WHERE client_id = ?", (client_id,))
             return cursor.fetchall()
-    
+
     def add_contact(self, client_id, nom, telephone="", courriel=""):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -122,7 +118,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?)
             """, (client_id, nom, telephone, courriel))
             conn.commit()
-    
+
     def update_contact(self, contact_id, nom, telephone, courriel):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -131,12 +127,11 @@ class DatabaseManager:
                 WHERE id = ?
             """, (nom, telephone, courriel, contact_id))
             conn.commit()
-    
+
     def delete_contact(self, contact_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
-
             conn.commit()
 
     def get_contact_by_name(self, nom):
@@ -148,13 +143,12 @@ class DatabaseManager:
             """, (nom,))
             return cursor.fetchone()
 
-    
     def get_main_doeuvre(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, metier, taux_horaire_chantier, taux_horaire_transport FROM main_doeuvre")
             return cursor.fetchall()
-    
+
     def add_main_doeuvre(self, metier, taux_horaire_chantier, taux_horaire_transport):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -163,7 +157,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?)
             """, (metier, taux_horaire_chantier, taux_horaire_transport))
             conn.commit()
-    
+
     def update_main_doeuvre(self, main_doeuvre_id, metier, taux_horaire_chantier, taux_horaire_transport):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -172,13 +166,13 @@ class DatabaseManager:
                 WHERE id = ?
             """, (metier, taux_horaire_chantier, taux_horaire_transport, main_doeuvre_id))
             conn.commit()
-    
+
     def delete_main_doeuvre(self, main_doeuvre_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM main_doeuvre WHERE id = ?", (main_doeuvre_id,))
             conn.commit()
-    
+
     def get_produit_details(self):
         """Récupère tous les détails des produits."""
         with self.get_connection() as conn:
@@ -188,7 +182,7 @@ class DatabaseManager:
                 FROM produits
             """)
             return cursor.fetchall()
-    
+
     def get_produit_ratios(self, produit_nom):
         """Récupère les ratios et la valeur par défaut pour un produit."""
         with self.get_connection() as conn:
@@ -199,7 +193,7 @@ class DatabaseManager:
                 WHERE produit_nom = ?
             """, (produit_nom,))
             return cursor.fetchall()
-    
+
     def add_produit(self, nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce, ratios=None):
         """Ajoute un produit et ses ratios (si type Ratio)."""
         with self.get_connection() as conn:
@@ -227,7 +221,7 @@ class DatabaseManager:
             except Exception as e:
                 conn.rollback()
                 raise e
-    
+
     def update_produit(self, old_nom, nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce, ratios=None):
         """Met à jour un produit et ses ratios (si type Ratio)."""
         with self.get_connection() as conn:
@@ -260,7 +254,7 @@ class DatabaseManager:
             except Exception as e:
                 conn.rollback()
                 raise e
-    
+
     def delete_produit(self, nom):
         """Supprime un produit (les ratios sont supprimés automatiquement via CASCADE)."""
         with self.get_connection() as conn:
@@ -268,13 +262,12 @@ class DatabaseManager:
             cursor.execute("DELETE FROM produits WHERE nom = ?", (nom,))
             conn.commit()
 
-
     def get_pensions(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, type_pension, montant_par_jour FROM pensions")
             return cursor.fetchall()
-    
+
     def add_pension(self, type_pension, montant_par_jour):
         try:
             with self.get_connection() as conn:
@@ -287,7 +280,7 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si la contrainte CHECK est violée
-    
+
     def update_pension(self, pension_id, type_pension, montant_par_jour):
         try:
             with self.get_connection() as conn:
@@ -300,7 +293,7 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si la contrainte CHECK est violée
-    
+
     def delete_pension(self, pension_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -312,7 +305,7 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("SELECT id, type_machinerie, taux_horaire FROM machinerie")
             return cursor.fetchall()
-    
+
     def add_machinerie(self, type_machinerie, taux_horaire):
         try:
             with self.get_connection() as conn:
@@ -325,7 +318,7 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si une contrainte est violée
-    
+
     def update_machinerie(self, machinerie_id, type_machinerie, taux_horaire):
         try:
             with self.get_connection() as conn:
@@ -338,20 +331,19 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si une contrainte est violée
-    
+
     def delete_machinerie(self, machinerie_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM machinerie WHERE id = ?", (machinerie_id,))
             conn.commit()
 
-    
     def get_apprets_scellants(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, nom_produit, prix, format_litres, couverture_pi2 FROM apprets_scellants")
             return cursor.fetchall()
-    
+
     def add_apprets_scellants(self, nom_produit, prix, format_litres, couverture_pi2):
         try:
             with self.get_connection() as conn:
@@ -364,7 +356,7 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si une contrainte est violée
-    
+
     def update_apprets_scellants(self, apprets_scellants_id, nom_produit, prix, format_litres, couverture_pi2):
         try:
             with self.get_connection() as conn:
@@ -377,19 +369,19 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si une contrainte est violée
-    
+
     def delete_apprets_scellants(self, apprets_scellants_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM apprets_scellants WHERE id = ?", (apprets_scellants_id,))
             conn.commit()
-    
+
     def get_membranes(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions FROM membranes")
             return cursor.fetchall()
-    
+
     def add_membranes(self, modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions):
         try:
             with self.get_connection() as conn:
@@ -402,7 +394,7 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si une contrainte est violée
-    
+
     def update_membranes(self, membranes_id, modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions):
         try:
             with self.get_connection() as conn:
@@ -415,13 +407,12 @@ class DatabaseManager:
                 return True
         except sqlite3.IntegrityError:
             return False  # Retourne False si une contrainte est violée
-    
+
     def delete_membranes(self, membranes_id):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM membranes WHERE id = ?", (membranes_id,))
             conn.commit()
-    
 
     def insert_submission(self, data: dict):
         with self.get_connection() as conn:
@@ -441,7 +432,6 @@ class DatabaseManager:
                 else:
                     raise
 
-
     def search_submissions(self, filters):
         """
         Recherche les soumissions selon les filtres fournis.
@@ -452,8 +442,8 @@ class DatabaseManager:
             - projet
             - ville
             - etat
-            - date_min
-            - date_max
+            - date_debut
+            - date_fin
         """
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -490,13 +480,13 @@ class DatabaseManager:
                 query += " AND etat = ?"
                 params.append(filters["etat"])
 
-            if filters.get("date_min"):
+            if filters.get("date_debut"):
                 query += " AND date_submission >= ?"
-                params.append(filters["date_min"])
+                params.append(filters["date_debut"])
 
-            if filters.get("date_max"):
+            if filters.get("date_fin"):
                 query += " AND date_submission <= ?"
-                params.append(filters["date_max"])
+                params.append(filters["date_fin"])
 
             cursor.execute(query, params)
             return cursor.fetchall()
@@ -532,7 +522,6 @@ class DatabaseManager:
             cursor.execute("DELETE FROM submissions WHERE submission_number = ?", (submission_number,))
             conn.commit()
 
-
     def get_membrane_by_nom(self, nom_membrane):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -542,3 +531,66 @@ class DatabaseManager:
                 WHERE LOWER(modele_membrane) = ?
             """, (nom_membrane.strip().lower(),))
             return cursor.fetchone()
+
+    def get_all_contacts_with_clients(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT contacts.id, contacts.nom, contacts.telephone, contacts.courriel,
+                    clients.nom AS client_name
+                FROM contacts
+                JOIN clients ON contacts.client_id = clients.id
+            """)
+            rows = cursor.fetchall()
+            return [
+                {"id": row[0], "nom": row[1], "telephone": row[2], "courriel": row[3], "client_name": row[4]}
+                for row in rows
+            ]
+
+    def search_work_sheets(self, criteres=None, limit=None):
+        """
+        Recherche les feuilles de travail dans chantiers_reels selon les critères fournis.
+        criteres : dict avec des clés parmi : soumission_reel, client_reel, adresse_reel, date_travaux, date_soumission
+        limit : nombre maximum de résultats à retourner (par exemple, 25 pour les dernières feuilles)
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT soumission_reel, client_reel, adresse_reel, date_travaux, date_soumission
+                FROM chantiers_reels
+                WHERE 1=1
+            """
+            params = []
+            if criteres:
+                for key, value in criteres.items():
+                    query += f" AND {key} LIKE ?"
+                    params.append(f"%{value}%")
+            query += " ORDER BY date_soumission DESC"
+            if limit:
+                query += f" LIMIT {limit}"
+            cursor.execute(query, params)
+            return cursor.fetchall()
+
+    def delete_work_sheet(self, soumission_reel):
+        """
+        Supprime une feuille de travail de la table chantiers_reels.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+            conn.commit()
+
+    def charger_feuille(self, soumission_reel):
+        """
+        Charge les données d'une feuille de travail depuis chantiers_reels.
+        Retourne un dictionnaire avec les colonnes et leurs valeurs.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            colonnes = [desc[0] for desc in cursor.description]
+            data = dict(zip(colonnes, row))
+            return data

@@ -14,9 +14,10 @@ class ExportDevisWindow:
         self.submission_data = submission_data
         self.window = tk.Toplevel(parent)
         self.window.title("Générer le devis")
-        self.window.geometry("600x650")
+        self.window.geometry("600x600")
         self.main_frame = tk.Frame(self.window)
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.main_frame.rowconfigure(999, weight=1)
 
 
         self.clauses_texts = {
@@ -87,7 +88,6 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
         row += 1
         tk.Label(main_frame, text="CLAUSES À INCLURE :", font=("Arial", 11, "bold")).grid(row=row, column=0, pady=(20, 5), sticky="w")
 
-
         for clause, var in self.clause_vars.items():
             row += 1
             tk.Checkbutton(main_frame, text=clause, variable=var).grid(row=row, column=0, columnspan=2, sticky="w", padx=20)
@@ -97,12 +97,10 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
 
         # Case à cocher "Marche d'escalier"
         row += 1
-        tk.Checkbutton(main_frame, text="Marche d'escalier", variable=self.marche_var, command=self.toggle_marche_fields).grid(row=row, column=0, columnspan=2, sticky="w", padx=20)
+        tk.Checkbutton(main_frame, text="Marche d'escalier", variable=self.marche_var, command=self.toggle_marche_fields).grid(
+            row=row, column=0, columnspan=2, sticky="w", padx=20)
 
-        # Champs conditionnels
-        self.marche_fields_frame = tk.Frame(main_frame)
-
-
+        # Termes de paiement
         row += 1
         tk.Label(main_frame, text="Termes de paiement:").grid(row=row, column=0, sticky="w", padx=10)
         options = ["NET JOUR DES TRAVAUX", "CH.POSTDATE 30 JRS", "NET 30 JOURS"]
@@ -112,16 +110,16 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
             area = float(self.submission_data.get("area", "0").replace(",", ""))
             mobilisations = float(self.submission_data.get("mobilisations", "0").replace(",", ""))
             surface_totale = round(area * mobilisations, 2)
-
             self.surface_totale_var.set(str(surface_totale))
         except Exception as e:
             print(f"[DEBUG] Erreur calcul surface : {e}")
             self.surface_totale_var.set("")
 
+        # Préparation du frame pour les champs marche d’escalier
+        self.marche_row = row + 1
+        self.marche_fields_frame = tk.Frame(main_frame)
 
-
-
-        row += 1
+        # Contenu du frame (mais on ne l’affiche pas encore)
         tk.Label(self.marche_fields_frame, text="Épaisseur :").grid(row=0, column=0, sticky="e", padx=5)
         epaisseur_menu = tk.OptionMenu(self.marche_fields_frame, self.epaisseur_var, "1-1/4''", "1-1/2''", "2''")
         epaisseur_menu.grid(row=0, column=1, sticky="w", padx=5)
@@ -129,16 +127,20 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
         tk.Label(self.marche_fields_frame, text="Quantité :").grid(row=1, column=0, sticky="e", padx=5)
         tk.Entry(self.marche_fields_frame, textvariable=self.quantite_var, width=10).grid(row=1, column=1, sticky="w", padx=5)
 
+        # Configuration pour forcer la dernière rangée à pousser vers le bas
+        main_frame.rowconfigure(999, weight=1)
 
+        # Bouton "Exporter vers Excel" toujours en bas
+        tk.Button(main_frame, text="Exporter vers Excel", command=self.export_to_excel).grid(
+            row=999, column=0, columnspan=2, pady=20, sticky="s")
 
-        row += 1
-        tk.Button(main_frame, text="Exporter vers Excel", command=self.export_to_excel).grid(row=row, column=0, columnspan=2, pady=20)
 
     def toggle_marche_fields(self):
         if self.marche_var.get():
-            self.marche_fields_frame.grid(row=99, column=0, columnspan=2, padx=20, pady=(0,10), sticky="w")
+            self.marche_fields_frame.grid(row=self.marche_row, column=0, columnspan=2, padx=20, pady=(0, 10), sticky="w")
         else:
             self.marche_fields_frame.grid_forget()
+
 
 
 

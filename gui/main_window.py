@@ -1,9 +1,14 @@
+
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+from ttkbootstrap.dialogs import Messagebox
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from gui.client_form import ClientForm
 from gui.client_details import ClientDetails
 from gui.parameters_window import ParametersWindow
-
+from gui.work_sheets_search_window import WorkSheetsSearchWindow  # Nouveau import
 
 class MainWindow:
     def __init__(self, root, db_manager):
@@ -24,9 +29,7 @@ class MainWindow:
         tk.Entry(search_frame, textvariable=self.search_var, width=30).pack(side="left", padx=5)
         tk.Button(search_frame, text="Rechercher", command=self.search_clients).pack(side="left", padx=5)
         tk.Button(search_frame, text="Réinitialiser", command=self.reset_search).pack(side="left", padx=5)
-
         tk.Button(search_frame, text="Recherche soumission", command=self.open_submission_search).pack(side="left", padx=5)
-
 
         # Section liste des clients
         list_frame = ttk.LabelFrame(main_frame, text="Liste des clients", padding=10)
@@ -58,17 +61,21 @@ class MainWindow:
         tk.Button(left_frame, text="Supprimer Client", command=self.delete_client).pack(side="left", padx=5)
         tk.Button(left_frame, text="Détails Client", command=self.open_client_details).pack(side="left", padx=5)
 
-        # Bouton séparé à droite
-        tk.Button(action_frame, text="Gestion des paramètres", command=self.open_parameters).pack(side="right", padx=5)
+        # Section gestion
+        gestion_frame = ttk.LabelFrame(main_frame, text="Gestion", padding=10)
+        gestion_frame.pack(fill="x", pady=5)
+        tk.Button(gestion_frame, text="Gestion des paramètres", command=self.open_parameters).pack(side="left", padx=5)
+        tk.Button(gestion_frame, text="Gestion des feuilles de travail", command=self.open_work_sheets).pack(side="left", padx=5)
 
         # Charger la liste initiale
         self.load_clients()
-
 
     def open_submission_search(self):
         from gui.submission_search_window import SubmissionSearchWindow
         SubmissionSearchWindow(self.root, self.db_manager)
 
+    def open_work_sheets(self):
+        WorkSheetsSearchWindow(self.root, self.db_manager)
 
     def load_clients(self, clients=None):
         """Charge ou actualise la liste des clients dans le Treeview."""

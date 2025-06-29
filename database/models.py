@@ -210,7 +210,10 @@ def migrer_table_submissions_si_necessaire(conn):
         "is_active": "ALTER TABLE submissions ADD COLUMN is_active BOOLEAN DEFAULT 1",
         "sequence": "ALTER TABLE submissions ADD COLUMN sequence INTEGER",
         "notes_json": "ALTER TABLE submissions ADD COLUMN notes_json TEXT",
-        "surfaces_json": "ALTER TABLE submissions ADD COLUMN surfaces_json TEXT"
+        "surfaces_json": "ALTER TABLE submissions ADD COLUMN surfaces_json TEXT",
+        "sable_transporter": "ALTER TABLE submissions ADD COLUMN sable_transporter TEXT",
+        "truck_tonnage": "ALTER TABLE submissions ADD COLUMN truck_tonnage TEXT",
+        "transport_sector": "ALTER TABLE submissions ADD COLUMN transport_sector TEXT"
     }
 
     # Obtenir les colonnes existantes

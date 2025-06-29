@@ -1,6 +1,8 @@
+from ttkbootstrap import ttk
+
 import tkinter as tk
 import json
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 from datetime import datetime
 from .submission_calcs import (calculate_distance, calculate_surface_per_mob, get_truck_tonnages, calculate_prix_par_sac, 
                                calculate_total_sacs, calculate_prix_total_sacs, calculer_quantite_sable, calculer_nombre_voyages_sable, 
@@ -8,7 +10,10 @@ from .submission_calcs import (calculate_distance, calculate_surface_per_mob, ge
                                calculer_prix_total_pension, valider_entree_numerique
 )
 from gui.export_devis import ExportDevisWindow
+from gui.select_contact_window import ContactSelector
+from gui.export_feuille_travail import ExportFeuilleTravailWindow
 
+print("Importation réussie!")
 
 
 
@@ -27,7 +32,7 @@ class ProjectNotesWindow:
     def __init__(self, parent, notes_data=None):
         self.window = tk.Toplevel(parent)
         self.window.title("Notes de Projet")
-        self.window.geometry("600x600")
+        self.window.geometry("600x650")
         self.window.transient(parent)
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)  # Gestion de la fermeture
         self.window.grab_set()
@@ -119,7 +124,7 @@ class DetailedSurfaceWindow:
     def __init__(self, parent, surface_data=None):
         self.window = tk.Toplevel(parent)
         self.window.title("Surface Détaillée")
-        self.window.geometry("400x500")
+        self.window.geometry("400x650")
         self.window.transient(parent)
         self.window.protocol("WM_DELETE_WINDOW", self.on_closing)  # Gestion de la fermeture
         self.window.grab_set()
@@ -437,8 +442,7 @@ class SubmissionForm:
         details = self.db_manager.get_produit_details()
         self.products = [(d[0], d) for d in details]  # d[0] = nom du produit
 
-        # Initialisation de la variable de sélection
-        self.product_var = tk.StringVar()
+
 
         # ✅ Sélection du premier produit par défaut, s’il existe
         if self.products:
@@ -640,8 +644,9 @@ class SubmissionForm:
 
 
         self.type_machinerie_menu = tk.OptionMenu(main_frame, self.type_machinerie_var, *types_machinerie)
-        self.type_machinerie_menu.config(width=standard_width, anchor="w")
+        self.type_machinerie_menu.config(width=standard_width, anchor="w")  # 👈 Texte aligné à gauche
         self.type_machinerie_menu.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
 
         # Ajouter au dictionnaire des champs
         self.champs["Type machinerie"] = self.type_machinerie_var
@@ -731,7 +736,7 @@ class SubmissionForm:
         entry_reperes.grid(row=4, column=1, padx=5, pady=5, sticky="w")
 
         # Sous-total ajustements (non modifiable)
-        tk.Label(ajustements_frame, text="SOUS-TOTAL AJUSTEMENTS ($) :").grid(row=5, column=0, padx=5, pady=10, sticky="e")
+        tk.Label(ajustements_frame, text="Sous-total Ajustements ($) :").grid(row=5, column=0, padx=5, pady=10, sticky="e")
         tk.Label(
             ajustements_frame,
             textvariable=self.sous_total_ajustements_var,
@@ -745,31 +750,31 @@ class SubmissionForm:
 
 
         # SOUS-TOTAL PRODUITS ET FOURNISSEURS
-        tk.Label(ajustements_frame, text="SOUS-TOTAL PRODUITS ET FOURNISSEURS ($) :").grid(row=6, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, text="Sous-total Produits et Fournisseurs ($) :").grid(row=6, column=0, padx=5, pady=5, sticky="e")
         tk.Label(ajustements_frame, textvariable=self.sous_total_fournisseurs_var, width=12, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=6, column=1, padx=5, pady=5, sticky="w")
 
 
         # SOUS-TOTAL MAIN D’OEUVRE ET MACHINERIE
-        tk.Label(ajustements_frame, text="SOUS-TOTAL MAIN D’OEUVRE ET MACHINERIE").grid(row=7, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, text="Sous-total Main d'oeuvre et Machinerie ($) :").grid(row=7, column=0, padx=5, pady=5, sticky="e")
         tk.Label(ajustements_frame, textvariable=self.sous_total_main_machinerie_var, font=("Helvetica", 10, "bold"),
                 width=12, relief="solid", borderwidth=1, anchor="center").grid(row=7, column=1, padx=5, pady=5, sticky="w")
 
 
         # TOTAL DES PRIX COÛTANTS
-        tk.Label(ajustements_frame, text="TOTAL DES PRIX COÛTANTS").grid(row=8, column=0, padx=5, pady=10, sticky="e")
+        tk.Label(ajustements_frame, text="Total des prix coutants ($) :").grid(row=8, column=0, padx=5, pady=10, sticky="e")
         tk.Label(ajustements_frame, textvariable=self.total_prix_coutants_var, font=("Helvetica", 10, "bold"),
                 width=12, relief="solid", borderwidth=1, anchor="center").grid(row=8, column=1, padx=5, pady=10, sticky="w")
 
 
         # Champ Administ./profit (%)
-        tk.Label(ajustements_frame, text="Administ./profit :").grid(row=9, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, text="Administ./profit (%) :").grid(row=9, column=0, padx=5, pady=5, sticky="e")
         entry_admin_profit = tk.Entry(ajustements_frame, textvariable=self.admin_profit_var, width=12, justify='center')
         entry_admin_profit.grid(row=9, column=1, padx=5, pady=5, sticky="w")
 
 
         # Champ Montant administ./profit ($)
         tk.Label(ajustements_frame, text="Montant administ./profit ($) :").grid(row=10, column=0, padx=5, pady=5, sticky="e")
-        tk.Label(ajustements_frame, textvariable=self.admin_profit_montant_var, width=12, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=10, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(ajustements_frame, textvariable=self.admin_profit_montant_var, width=15, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=10, column=1, padx=5, pady=5, sticky="w")
 
         # Champ Prix de vente client ($)
         tk.Label(ajustements_frame, text="Prix de vente client ($) :").grid(row=11, column=0, padx=5, pady=5, sticky="e")
@@ -778,12 +783,12 @@ class SubmissionForm:
 
         # Champ Prix unitaire au pi²
         # Champ Prix unitaire au pi²
-        tk.Label(ajustements_frame, text="Prix unitaire au pi² :").grid(row=12, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, text="Prix unitaire au pi² ($) :", font=("Arial", 10, "bold")).grid(row=12, column=0, padx=5, pady=5, sticky="e")
         tk.Label(ajustements_frame, textvariable=self.prix_unitaire_var, width=12, relief="solid", borderwidth=1, anchor="center", font=('Helvetica', 10, 'bold')).grid(row=12, column=1, padx=5, pady=5, sticky="w")
 
 
         # Champ Prix total par immeuble
-        tk.Label(ajustements_frame, text="Prix total par immeuble :").grid(row=13, column=0, padx=5, pady=5, sticky="e")
+        tk.Label(ajustements_frame, text="Prix total par immeuble ($) :", font=("Arial", 10, "bold")).grid(row=13, column=0, padx=5, pady=5, sticky="e")
         tk.Label(ajustements_frame, textvariable=self.prix_total_immeuble_var, width=12, relief="solid", borderwidth=1, anchor="center", font=('Helvetica', 10, 'bold')).grid(row=13, column=1, padx=5, pady=5, sticky="w")
 
         # Champ Prix au pi² ajusté (modifiable)
@@ -807,10 +812,57 @@ class SubmissionForm:
         tk.Button(btn_frame, text="Dupliquer cette Soumission", command=lambda: self.save_submission(final=True, duplication=True)).grid(row=0, column=3, padx=5)
         tk.Button(btn_frame, text="Annuler", command=self.window.destroy).grid(row=0, column=4, padx=5)
         tk.Button(btn_frame, text="Générer le devis", command=self.generer_devis).grid(row=0, column=5, padx=5)
+        tk.Button(btn_frame, text="Feuille de travail", command=lambda: ExportFeuilleTravailWindow(self.window, self.get_submission_data(), self.db_manager)).grid(row=0, column=6, padx=5)
+
+
+
+
 
 
         self.existing_submission = existing_submission
         self.init_chargement()
+
+
+    def get_submission_data(self):
+        try:
+            data = {
+                "submission_number": self.submission_number_var.get(),
+                "client_name": self.client_var.get(),
+                "contact": self.contact_var.get(),
+                # "telephone": self.telephone_contact_var.get(),  # ❌ À retirer
+                "ville": self.ville_var.get(),
+                "product": self.product_var.get(),
+                "area": self.area_var.get(),
+                "thickness": self.thickness_var.get(),
+                "subfloor": self.subfloor_var.get(),
+                "distance": self.distance_var.get(),
+                "total_sacs": self.total_sacs_var.get(),
+                "sable_total": self.sable_total_var.get(),          
+                "sable_transporter": self.sable_transporter_var.get(),
+                "membrane": self.membrane_var.get(),
+                "pose_membrane": self.pose_membrane_var.get(),
+
+
+            }
+
+            # Recherche le téléphone du contact
+            contact_name = data["contact"]
+            client_name = data["client_name"]
+            all_contacts = self.db_manager.get_all_contacts_with_clients()
+
+            data["telephone"] = ""  # Valeur par défaut
+            for c in all_contacts:
+                if c["nom"] == contact_name and c["client_name"] == client_name:
+                    data["telephone"] = c["telephone"]
+                    break
+
+            return data
+
+
+        except Exception as e:
+            print(f"[ERREUR] get_submission_data : {e}")
+            return {}
+
 
 
 
@@ -883,6 +935,13 @@ class SubmissionForm:
         import json
         self.notes_data = json.loads(data.get("notes_json", "{}"))
         self.surface_data = json.loads(data.get("surfaces_json", "{}"))
+
+        self.sable_transporter_var.set(data.get("sable_transporter", ""))
+        self.truck_tonnage_var.set(data.get("truck_tonnage", ""))
+        
+        self.transport_sector_var.set(data.get("transport_sector", ""))
+
+
 
 
 
@@ -1439,11 +1498,26 @@ class SubmissionForm:
         try:
             submission_number = self.submission_number_var.get()
 
+            if duplication and not hasattr(self, "_contact_selected"):  # <- nouveau flag temporaire
+                def on_contact_selected(contact):
+                    self.client_var.set(contact["client_name"])
+                    self.contact_var.set(contact["nom"])
+                    self._contact_selected = True  # ← marquer que le contact a été choisi
+                    self.save_submission(final=final, revision=revision, duplication=True)
+
+                ContactSelector(self.window, self.db_manager, on_contact_selected)
+                return
+
+
+            # Si on revient ici, c'est qu'on a sélectionné un contact, donc on génère le numéro
             if duplication:
-                # Crée un tout nouveau numéro unique (ex: S25-402)
                 self.generate_submission_number()
                 submission_number = self.submission_number_var.get()
                 revision_number = 0
+
+                if hasattr(self, "_contact_selected"):
+                    del self._contact_selected
+
 
             elif revision:
                 # Extrait le préfixe (ex: S25-402)
@@ -1528,7 +1602,11 @@ class SubmissionForm:
                 "prix_pi2_ajuste": self.prix_pi2_ajuste_var.get(),
                 "prix_total_ajuste": self.prix_total_ajuste_var.get(),
                 "notes_json": json.dumps(self.notes_data),
-                "surfaces_json": json.dumps(self.surface_data)
+                "surfaces_json": json.dumps(self.surface_data),
+                "sable_transporter": self.sable_transporter_var.get(),
+                "truck_tonnage": self.truck_tonnage_var.get(),
+                "transport_sector": self.transport_sector_var.get()
+
             }
 
             self.db_manager.insert_submission(data)
