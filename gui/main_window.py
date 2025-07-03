@@ -1,4 +1,3 @@
-
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.dialogs import Messagebox
@@ -29,7 +28,6 @@ class MainWindow:
         tk.Entry(search_frame, textvariable=self.search_var, width=30).pack(side="left", padx=5)
         tk.Button(search_frame, text="Rechercher", command=self.search_clients).pack(side="left", padx=5)
         tk.Button(search_frame, text="Réinitialiser", command=self.reset_search).pack(side="left", padx=5)
-        tk.Button(search_frame, text="Recherche soumission", command=self.open_submission_search).pack(side="left", padx=5)
 
         # Section liste des clients
         list_frame = ttk.LabelFrame(main_frame, text="Liste des clients", padding=10)
@@ -61,11 +59,16 @@ class MainWindow:
         tk.Button(left_frame, text="Supprimer Client", command=self.delete_client).pack(side="left", padx=5)
         tk.Button(left_frame, text="Détails Client", command=self.open_client_details).pack(side="left", padx=5)
 
+        # Nouvelle section Recherche
+        search_advanced_frame = ttk.LabelFrame(main_frame, text="Recherche", padding=10)
+        search_advanced_frame.pack(fill="x", pady=5)
+        tk.Button(search_advanced_frame, text="Recherche soumission", command=self.open_submission_search).pack(side="left", padx=5)
+        tk.Button(search_advanced_frame, text="Recherche feuille de travail", command=self.open_work_sheets).pack(side="left", padx=5)
+
         # Section gestion
         gestion_frame = ttk.LabelFrame(main_frame, text="Gestion", padding=10)
         gestion_frame.pack(fill="x", pady=5)
         tk.Button(gestion_frame, text="Gestion des paramètres", command=self.open_parameters).pack(side="left", padx=5)
-        tk.Button(gestion_frame, text="Gestion des feuilles de travail", command=self.open_work_sheets).pack(side="left", padx=5)
 
         # Charger la liste initiale
         self.load_clients()

@@ -8,6 +8,8 @@ import xlwings as xw
 from datetime import datetime
 import re
 
+from gui.manual_work_sheet_entry import ManualWorkSheetEntry
+
 class ExportFeuilleTravailWindow:
     def __init__(self, parent, submission_data, db_manager):
         self.submission_data = submission_data
@@ -98,6 +100,255 @@ class ExportFeuilleTravailWindow:
         btn_formulaire = tk.Button(button_frame, text="Générer formulaire web", command=self.generer_formulaire_web)
         btn_formulaire.grid(row=0, column=1, padx=10)
 
+        btn_manual_entry = tk.Button(button_frame, text="Entrer feuille travail manuellement", command=self.open_manual_work_sheet_entry)
+        btn_manual_entry.grid(row=0, column=2, padx=10)
+
+    def open_manual_work_sheet_entry(self):
+        form_html = self.generer_formulaire_web_content()
+        ManualWorkSheetEntry(self.window, form_html, self.submission_data, self.db_manager, self.pose_membrane_var.get())
+
+
+    def generer_formulaire_web_content(self):
+        donnees = self.submission_data.copy()
+        donnees["date_travaux"] = self.date_travaux_var.get()
+        donnees["telephone"] = self.telephone_contact_var.get()
+        donnees["sable_commande"] = self.sable_commande_var.get()
+        donnees["type_projet"] = self.type_projet_var.get()
+        donnees["cheque"] = "OUI" if self.cheque_var.get() else "NON"
+        donnees["pose_membrane"] = self.pose_membrane_var.get()
+        donnees["marches"] = self.marches_var.get()
+        donnees["notes"] = self.notes_text.get("1.0", "end").strip()
+
+        rouleaux = self.calculer_rouleaux_membrane(
+            donnees.get('area', ''),
+            donnees.get('membrane', '')
+        )
+
+        employes = [
+            "KASSIM GOSSELIN", "ALEX VALOIS", "KARL", "ANTHONY ALLAIRE",
+            "MARC POTHIER", "NATHAN", "ANTHONY LABBÉ", "JONATHAN GRENIER"
+        ]
+
+        rows_html = ""
+        for i, nom in enumerate(employes, start=1):
+            rows_html += f"""
+            <tr>
+                <td>{nom}</td>
+                <td><input type="checkbox" name="presence_{i}"></td>
+                <td>
+                    <select name="vehicule_{i}">
+                        <option value="">--</option>
+                        <option value="West">West</option>
+                        <option value="Inter">Inter</option>
+                        <option value="Hino">Hino</option>
+                        <option value="Duramax 3500">Duramax 3500</option>
+                        <option value="Duramax 2500">Duramax 2500</option>
+                    </select>
+                </td>
+                <td><input type="checkbox" name="chauffeur_aller_{i}"></td>
+                <td><input type="checkbox" name="chauffeur_retour_{i}"></td>
+                <td><select name="heure_debut_{i}" class="heure-select"></select></td>
+                <td><select name="heure_fin_{i}" class="heure-select"></select></td>
+                <td><select name="temps_transport_{i}" class="transport-select"></select></td>
+                <td><select name="heures_entrepot_{i}" class="transport-select"></select></td>
+            </tr>
+            """
+        for j in range(1, 4):
+            idx = len(employes) + j
+            rows_html += f"""
+            <tr>
+                <td><input type="text" name="nom_custom_{idx}" placeholder="Nom employé {idx}" style="width: 100px;"></td>
+                <td><input type="checkbox" name="presence_{idx}"></td>
+                <td>
+                    <select name="vehicule_{idx}">
+                        <option value="">--</option>
+                        <option value="West">West</option>
+                        <option value="Inter">Inter</option>
+                        <option value="Hino">Hino</option>
+                        <option value="Duramax 3500">Duramax 3500</option>
+                        <option value="Duramax 2500">Duramax 2500</option>
+                    </select>
+                </td>
+                <td><input type="checkbox" name="chauffeur_aller_{idx}"></td>
+                <td><input type="checkbox" name="chauffeur_retour_{idx}"></td>
+                <td><select name="heure_debut_{idx}" class="heure-select"></select></td>
+                <td><select name="heure_fin_{idx}" class="heure-select"></select></td>
+                <td><select name="temps_transport_{idx}" class="transport-select"></select></td>
+                <td><select name="heures_entrepot_{idx}" class="transport-select"></select></td>
+            </tr>
+            """
+
+        return f"""
+        <html>
+        <head>
+            <style>
+                .form-row {{ display: flex; gap: 20px; margin-bottom: 10px; }}
+                .form-group {{ flex: 1; }}
+                .form-group label {{ display: block; margin-bottom: 5px; }}
+                .form-group input, .form-group select, .form-group textarea {{ width: 100%; padding: 5px; }}
+                .form-group input[readonly] {{ background-color: #f0f0f0; }}
+                .heure-select, .transport-select {{ width: 80px; }}
+                table {{ width: 100%; border-collapse: collapse; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+                textarea {{ resize: vertical; }}
+            </style>
+        </head>
+        <body>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Soumission</label>
+                    <input name="soumission" value="{donnees['submission_number']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Client</label>
+                    <input name="client" value="{donnees['client_name']}" readonly>
+                </div>
+            </div>
+            <label>Adresse</label>
+            <input name="adresse_reel" value="{donnees['ville']}" readonly>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Contact</label>
+                    <input name="contact" value="{donnees['contact']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Téléphone</label>
+                    <input name="telephone" value="{donnees['telephone']}" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Chèque à ramasser</label>
+                    <input name="cheque" value="{donnees['cheque']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Type de projet</label>
+                    <input name="type_projet" value="{donnees['type_projet']}" readonly>
+                </div>
+            </div>
+            <label>Produit</label>
+            <input name="produit" value="{donnees['product']}" readonly>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Produit utilisé si différent</label>
+                    <select name="produit_diff">
+                        <option value="">--</option>
+                        <option value="Maxcrete complete">Maxcrete complete</option>
+                        <option value="Surface Gyp">Surface Gyp</option>
+                        <option value="Autre">Autre</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Superficie (pi²)</label>
+                    <input name="superficie" value="{donnees['area']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Épaisseur moyenne</label>
+                    <input name="thickness" value="{donnees['thickness']}" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Sacs prévus</label>
+                    <input name="nb_sacs_prevus" value="{donnees['total_sacs']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Sacs utilisés *</label>
+                    <input name="sacs_utilises" required style="background-color: #fff3b0;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantité de sable théorique</label>
+                    <input name="sable_total" value="{donnees['sable_total']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Transporteur</label>
+                    <input name="sable_transporter" value="{donnees['sable_transporter']}" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Sable commandé (tm)</label>
+                    <input name="sable_commande" value="{donnees['sable_commande']}">
+                </div>
+                <div class="form-group">
+                    <label>Surplus de sable (tm)</label>
+                    <input name="sable_utilise" required style="background-color: #fff3b0;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Type de membrane</label>
+                    <input name="type_membrane" value="{donnees['membrane']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Nombre de rouleaux prévus</label>
+                    <input name="nb_rouleaux" value="{rouleaux}" readonly>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Installation membrane</label>
+                    <select name="membrane_posee" style="background-color: #fff3b0;">
+                        <option value="">-- Choisir --</option>
+                        <option value="OUI">OUI</option>
+                        <option value="NON">NON</option>
+                        <option value="OUI AVEC DIVISIONS">OUI AVEC DIVISIONS</option>
+                        <option value="OUI SANS DIVISIONS">OUI SANS DIVISIONS</option>
+                        <option value="OUI POSE MIXTE">OUI POSE MIXTE</option>
+                        <option value="PAR CLIENT">PAR CLIENT</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nombre de rouleaux installés</label>
+                    <input name="nb_rouleaux_installes" style="background-color: #fff3b0;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Marche à remplir théorique</label>
+                    <input name="marches_theorique" value="{donnees['marches']}" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Marche à remplir réel</label>
+                    <input name="marches_reel" style="background-color: #fff3b0;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="width: 100%;">
+                    <label>Notes bureau</label>
+                    <textarea name="notes_bureau" rows="3" readonly>{donnees['notes']}</textarea>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="width: 100%;">
+                    <label>Notes chantier</label>
+                    <textarea name="notes_chantier" rows="4" placeholder="Entrez les notes du chantier ici..."></textarea>
+                </div>
+            </div>
+            <h3>Heures chantier</h3>
+            <table border="1" cellspacing="0" cellpadding="4" style="width: 100%; table-layout: fixed;">
+                <tr>
+                    <th style="width: 150px;">Employé</th>
+                    <th>Prés.</th>
+                    <th>Véhicule</th>
+                    <th>Chauff. aller</th>
+                    <th>Chauff. retour</th>
+                    <th>Heure début</th>
+                    <th>Heure fin</th>
+                    <th>Temps transport</th>
+                    <th>Heures entrepôt</th>
+                </tr>
+                {rows_html}
+            </table>
+        </body>
+        </html>
+        """
+
     def exporter_feuille_travail(self):
         donnees = self.submission_data.copy()
         donnees["date_travaux"] = self.date_travaux_var.get()
@@ -151,14 +402,16 @@ class ExportFeuilleTravailWindow:
             wb.save(output_path)
             wb.close()
             messagebox.showinfo("Succès", f"Feuille de travail exportée avec succès : {nom_fichier}")
-            print(f"✅ Feuille de travail exportée : {nom_fichier}")
+            
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l'exportation vers Excel : {str(e)}")
-            print(f"[ERREUR] Échec de l'exportation vers Excel : {e}")
+            
 
     def generer_formulaire_web(self):
         donnees = self.submission_data.copy()
         donnees["date_travaux"] = self.date_travaux_var.get()
+        if not donnees["date_travaux"]:  # Valider date_travaux
+            raise ValueError("date_travaux est vide ou invalide")
         donnees["telephone"] = self.telephone_contact_var.get()
         donnees["sable_commande"] = self.sable_commande_var.get()
         donnees["type_projet"] = self.type_projet_var.get()
@@ -178,7 +431,6 @@ class ExportFeuilleTravailWindow:
         ]
 
         rows_html = ""
-        # Lignes des employés connus
         for i, nom in enumerate(employes, start=1):
             rows_html += f"""
             <tr>
@@ -202,8 +454,6 @@ class ExportFeuilleTravailWindow:
                 <td><select name="heures_entrepot_{i}" class="transport-select"></select></td>
             </tr>
             """
-
-        # Lignes personnalisables (9 à 11)
         for j in range(1, 4):
             idx = len(employes) + j
             rows_html += f"""
@@ -231,7 +481,6 @@ class ExportFeuilleTravailWindow:
 
         form_html = f"""
         <form action="/submit" method="POST">
-            <input type="hidden" name="date_travaux" value="{donnees['date_travaux']}">
             <div class="form-row">
                 <div class="form-group">
                     <label>Soumission</label>
@@ -242,17 +491,14 @@ class ExportFeuilleTravailWindow:
                     <input name="client" value="{donnees['client_name']}" readonly>
                 </div>
             </div>
-
             <label>Adresse</label>
             <input name="adresse_reel" value="{donnees['ville']}" readonly>
-            
             <br>
             <a href="https://www.google.com/maps/dir/?api=1&destination={donnees['ville'].replace(' ', '+')}" 
             target="_blank" 
             style="display: inline-block; margin-top: 5px; padding: 6px 12px; background-color: #3498db; color: white; text-decoration: none; border-radius: 4px;">
             🗺️ Itinéraire Google Maps
             </a>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Contact</label>
@@ -263,7 +509,6 @@ class ExportFeuilleTravailWindow:
                     <input name="telephone" value="{donnees['telephone']}" readonly>
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Chèque à ramasser</label>
@@ -274,11 +519,9 @@ class ExportFeuilleTravailWindow:
                     <input name="type_projet" value="{donnees['type_projet']}" readonly>
                 </div>
             </div>
-
             <label>Produit</label>
             <input name="produit" value="{donnees['product']}" readonly>
-
-            <div class="form-row" style="margin-top: 10px;">
+            <div class="form-row">
                 <div class="form-group">
                     <label>Produit utilisé si différent</label>
                     <select name="produit_diff">
@@ -289,7 +532,6 @@ class ExportFeuilleTravailWindow:
                     </select>
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Superficie (pi²)</label>
@@ -300,7 +542,6 @@ class ExportFeuilleTravailWindow:
                     <input name="thickness" value="{donnees['thickness']}" readonly>
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Sacs prévus</label>
@@ -311,7 +552,6 @@ class ExportFeuilleTravailWindow:
                     <input name="sacs_utilises" required style="background-color: #fff3b0;">
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Quantité de sable théorique</label>
@@ -322,7 +562,6 @@ class ExportFeuilleTravailWindow:
                     <input name="sable_transporter" value="{donnees['sable_transporter']}" readonly>
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Sable commandé (tm)</label>
@@ -333,7 +572,6 @@ class ExportFeuilleTravailWindow:
                     <input name="sable_utilise" required style="background-color: #fff3b0;">
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Type de membrane</label>
@@ -344,18 +582,17 @@ class ExportFeuilleTravailWindow:
                     <input name="nb_rouleaux" value="{rouleaux}" readonly>
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Installation membrane</label>
                     <select name="membrane_posee" style="background-color: #fff3b0;">
                         <option value="">-- Choisir --</option>
-                        <option value="OUI" {"selected" if self.pose_membrane_var.get() == "OUI" else ""}>OUI</option>
-                        <option value="NON" {"selected" if self.pose_membrane_var.get() == "NON" else ""}>NON</option>
-                        <option value="OUI AVEC DIVISIONS" {"selected" if self.pose_membrane_var.get() == "OUI AVEC DIVISIONS" else ""}>OUI AVEC DIVISIONS</option>
-                        <option value="OUI SANS DIVISIONS" {"selected" if self.pose_membrane_var.get() == "OUI SANS DIVISIONS" else ""}>OUI SANS DIVISIONS</option>
-                        <option value="OUI POSE MIXTE" {"selected" if self.pose_membrane_var.get() == "OUI POSE MIXTE" else ""}>OUI POSE MIXTE</option>
-                        <option value="PAR CLIENT" {"selected" if self.pose_membrane_var.get() == "PAR CLIENT" else ""}>PAR CLIENT</option>
+                        <option value="OUI">OUI</option>
+                        <option value="NON">NON</option>
+                        <option value="OUI AVEC DIVISIONS">OUI AVEC DIVISIONS</option>
+                        <option value="OUI SANS DIVISIONS">OUI SANS DIVISIONS</option>
+                        <option value="OUI POSE MIXTE">OUI POSE MIXTE</option>
+                        <option value="PAR CLIENT">PAR CLIENT</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -363,7 +600,6 @@ class ExportFeuilleTravailWindow:
                     <input name="nb_rouleaux_installes" style="background-color: #fff3b0;">
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group">
                     <label>Marche à remplir théorique</label>
@@ -374,7 +610,6 @@ class ExportFeuilleTravailWindow:
                     <input name="marches_reel" style="background-color: #fff3b0;">
                 </div>
             </div>
-
             <div class="form-row">
                 <div class="form-group" style="width: 100%;">
                     <label>Notes bureau</label>
@@ -387,7 +622,6 @@ class ExportFeuilleTravailWindow:
                     <textarea name="notes_chantier" rows="4" placeholder="Entrez les notes du chantier ici..."></textarea>
                 </div>
             </div>
-
             <h3>Heures chantier</h3>
             <table class="heure-chantier" border="1" cellspacing="0" cellpadding="4" style="width: 100%; table-layout: fixed;">
                 <tr>
@@ -398,13 +632,12 @@ class ExportFeuilleTravailWindow:
                     <th>Chauff. retour</th>
                     <th>Heure début</th>
                     <th>Heure fin</th>
-                    <th>Temps<br>transport</th>
-                    <th>Heures<br>entrepôt</th>
+                    <th>Temps transport</th>
+                    <th>Heures entrepôt</th>
                 </tr>
                 {rows_html}
             </table>
-
-            <button type="submit" class="submit">Soumettre</button>
+            <input type="submit" value="Soumettre" class="btn btn-primary mt-3">
         </form>
         """
 
@@ -429,10 +662,12 @@ class ExportFeuilleTravailWindow:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             messagebox.showinfo("Succès", f"Formulaire web généré avec succès pour {donnees['date_travaux']}")
-            print(f"✅ Formulaire web généré pour {donnees['date_travaux']}")
+            
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de la génération du formulaire web : {str(e)}")
-            print(f"[ERREUR] Échec de la génération du formulaire web : {e}")
+            
+
+        
 
     def calculer_rouleaux_membrane(self, surface_str, membrane_nom):
         try:

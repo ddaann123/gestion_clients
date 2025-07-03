@@ -13,7 +13,7 @@ from gui.export_devis import ExportDevisWindow
 from gui.select_contact_window import ContactSelector
 from gui.export_feuille_travail import ExportFeuilleTravailWindow
 
-print("Importation réussie!")
+
 
 
 
@@ -710,29 +710,29 @@ class SubmissionForm:
         # Champs Ajustement 1
         ajust_label1 = tk.Entry(ajustements_frame, width=20)
         ajust_label1.insert(0, "Ajustement 1")
-        ajust_label1.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        ajust_value1 = tk.Entry(ajustements_frame, textvariable=self.ajustement1_var, width=12, justify='center')
-        ajust_value1.grid(row=0, column=1, padx=5, pady=5)
+        ajust_label1.grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        ajust_value1 = tk.Entry(ajustements_frame, textvariable=self.ajustement1_var, width=16, justify='center')
+        ajust_value1.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
         # Champs Ajustement 2
         ajust_label2 = tk.Entry(ajustements_frame, width=20)
         ajust_label2.insert(0, "Ajustement 2")
-        ajust_label2.grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        ajust_value2 = tk.Entry(ajustements_frame, textvariable=self.ajustement2_var, width=12, justify='center')
-        ajust_value2.grid(row=1, column=1, padx=5, pady=5)
+        ajust_label2.grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        ajust_value2 = tk.Entry(ajustements_frame, textvariable=self.ajustement2_var, width=16, justify='center')
+        ajust_value2.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
         # Champs Ajustement 3
         ajust_label3 = tk.Entry(ajustements_frame, width=20)
         ajust_label3.insert(0, "Ajustement 3")
-        ajust_label3.grid(row=2, column=0, padx=5, pady=5, sticky="w")
-        ajust_value3 = tk.Entry(ajustements_frame, textvariable=self.ajustement3_var, width=12, justify='center')
-        ajust_value3.grid(row=2, column=1, padx=5, pady=5)
+        ajust_label3.grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        ajust_value3 = tk.Entry(ajustements_frame, textvariable=self.ajustement3_var, width=16, justify='center')
+        ajust_value3.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
 
 
         # Repères de nivellement
         tk.Label(ajustements_frame, text="Repères de nivellement :").grid(row=4, column=0, padx=5, pady=5, sticky="e")
-        entry_reperes = tk.Entry(ajustements_frame, textvariable=self.reperes_var, width=15, justify='center')
+        entry_reperes = tk.Entry(ajustements_frame, textvariable=self.reperes_var, width=16, justify='center')
         entry_reperes.grid(row=4, column=1, padx=5, pady=5, sticky="w")
 
         # Sous-total ajustements (non modifiable)
@@ -768,13 +768,13 @@ class SubmissionForm:
 
         # Champ Administ./profit (%)
         tk.Label(ajustements_frame, text="Administ./profit (%) :").grid(row=9, column=0, padx=5, pady=5, sticky="e")
-        entry_admin_profit = tk.Entry(ajustements_frame, textvariable=self.admin_profit_var, width=12, justify='center')
+        entry_admin_profit = tk.Entry(ajustements_frame, textvariable=self.admin_profit_var, width=16, justify='center')
         entry_admin_profit.grid(row=9, column=1, padx=5, pady=5, sticky="w")
 
 
         # Champ Montant administ./profit ($)
         tk.Label(ajustements_frame, text="Montant administ./profit ($) :").grid(row=10, column=0, padx=5, pady=5, sticky="e")
-        tk.Label(ajustements_frame, textvariable=self.admin_profit_montant_var, width=15, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=10, column=1, padx=5, pady=5, sticky="w")
+        tk.Label(ajustements_frame, textvariable=self.admin_profit_montant_var, width=12, relief="solid", borderwidth=1, anchor="center", font=("Helvetica", 10, "bold")).grid(row=10, column=1, padx=5, pady=5, sticky="w")
 
         # Champ Prix de vente client ($)
         tk.Label(ajustements_frame, text="Prix de vente client ($) :").grid(row=11, column=0, padx=5, pady=5, sticky="e")
@@ -793,11 +793,11 @@ class SubmissionForm:
 
         # Champ Prix au pi² ajusté (modifiable)
         tk.Label(ajustements_frame, text="Prix au pi² ajusté :").grid(row=14, column=0, padx=5, pady=5, sticky="e")
-        tk.Entry(ajustements_frame, textvariable=self.prix_pi2_ajuste_var, width=12, justify='center').grid(row=14, column=1, padx=5, pady=5, sticky="w")
+        tk.Entry(ajustements_frame, textvariable=self.prix_pi2_ajuste_var, width=16, justify='center').grid(row=14, column=1, padx=5, pady=5, sticky="w")
 
         # Champ Prix total ajusté (modifiable)
         tk.Label(ajustements_frame, text="Prix total ajusté :").grid(row=15, column=0, padx=5, pady=5, sticky="e")
-        tk.Entry(ajustements_frame, textvariable=self.prix_total_ajuste_var, width=12, justify='center').grid(row=15, column=1, padx=5, pady=5, sticky="w")
+        tk.Entry(ajustements_frame, textvariable=self.prix_total_ajuste_var, width=16, justify='center').grid(row=15, column=1, padx=5, pady=5, sticky="w")
 
 
 
@@ -860,7 +860,7 @@ class SubmissionForm:
 
 
         except Exception as e:
-            print(f"[ERREUR] get_submission_data : {e}")
+           
             return {}
 
 
@@ -960,7 +960,7 @@ class SubmissionForm:
             total = prix_unitaire * surface_totale
             self.prix_total_immeuble_var.set(f"{total:.2f} $")
         except Exception as e:
-            print(f"[ERREUR] update_prix_total_immeuble : {e}")
+            
             self.prix_total_immeuble_var.set("0.00")
 
 
@@ -986,7 +986,7 @@ class SubmissionForm:
             unitaire = prix_vente / superficie
             self.prix_unitaire_var.set(f"{unitaire:.2f}")
         except Exception as e:
-            print(f"[ERREUR] update_prix_unitaire : {e}")
+            
             self.prix_unitaire_var.set("0.00")
 
 
@@ -1003,7 +1003,7 @@ class SubmissionForm:
             total_str = self.total_prix_coutants_var.get().replace(" $", "").strip()
             admin_str = self.admin_profit_montant_var.get().replace(" $", "").strip()
 
-            print(f"[DEBUG] total_str={total_str}, admin_str={admin_str}")
+            
 
             if not total_str.replace('.', '', 1).isdigit() or not admin_str.replace('.', '', 1).isdigit():
                 raise ValueError("Valeur non numérique")
@@ -1015,7 +1015,7 @@ class SubmissionForm:
             self.prix_vente_client_var.set(f"{prix_vente:.2f} $")
 
         except Exception as e:
-            print(f"[ERREUR] update_prix_vente_client : {e}")
+            
             self.prix_vente_client_var.set("Erreur")
 
 
@@ -1070,7 +1070,7 @@ class SubmissionForm:
             self.total_prix_coutants_var.set(f"{total:.2f} $")
 
         except Exception as e:
-            print(f"[ERREUR] update_total_prix_coutants : {e}")
+            
             self.total_prix_coutants_var.set("Erreur")
 
 
@@ -1089,7 +1089,7 @@ class SubmissionForm:
             self.sous_total_main_machinerie_var.set(f"{total:.2f} $")
 
         except Exception as e:
-            print(f"[ERREUR] update_sous_total_main_machinerie : {e}")
+            
             self.sous_total_main_machinerie_var.set("Erreur")
 
         self.update_total_prix_coutants()
@@ -1104,7 +1104,7 @@ class SubmissionForm:
             total = sealant_total + total_sacs + total_sable
             self.sous_total_fournisseurs_var.set(f"{total:.2f} $")
         except Exception as e:
-            print(f"[ERREUR] update_sous_total_fournisseurs : {e}")
+            
             self.sous_total_fournisseurs_var.set("Erreur")
 
         self.update_total_prix_coutants()
@@ -1124,7 +1124,7 @@ class SubmissionForm:
             total = sum(montants)
             self.sous_total_ajustements_var.set(f"{total:.2f} $")
         except Exception as e:
-            print(f"[ERREUR] update_sous_total_ajustements : {e}")
+            
             self.sous_total_ajustements_var.set("Erreur")
 
         self.update_total_prix_coutants()
@@ -1508,7 +1508,6 @@ class SubmissionForm:
                 ContactSelector(self.window, self.db_manager, on_contact_selected)
                 return
 
-
             # Si on revient ici, c'est qu'on a sélectionné un contact, donc on génère le numéro
             if duplication:
                 self.generate_submission_number()
@@ -1517,7 +1516,6 @@ class SubmissionForm:
 
                 if hasattr(self, "_contact_selected"):
                     del self._contact_selected
-
 
             elif revision:
                 # Extrait le préfixe (ex: S25-402)
@@ -1606,21 +1604,27 @@ class SubmissionForm:
                 "sable_transporter": self.sable_transporter_var.get(),
                 "truck_tonnage": self.truck_tonnage_var.get(),
                 "transport_sector": self.transport_sector_var.get()
-
             }
 
-            self.db_manager.insert_submission(data)
-            messagebox.showinfo("Succès", f"Soumission enregistrée : {submission_number}")
+            # Vérifier si la soumission existe déjà
+            existing_submission = self.db_manager.get_submission_by_number(submission_number)
 
+            if existing_submission and final and not revision and not duplication:
+                # Mettre à jour l'existant
+                self.db_manager.update_submission(submission_number, data)
+                messagebox.showinfo("Succès", f"Soumission mise à jour : {submission_number}")
+            else:
+                # Insérer une nouvelle soumission
+                self.db_manager.insert_submission(data)
+                messagebox.showinfo("Succès", f"Soumission enregistrée : {submission_number}")
 
             self.window.destroy()
-
 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l’enregistrement : {e}")
 
 
-
+    
 
     def open_project_notes(self):
         # Ouvre la fenêtre des notes et passe les données actuelles

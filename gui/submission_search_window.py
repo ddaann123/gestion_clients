@@ -13,6 +13,8 @@ class SubmissionSearchWindow:
         self.window.geometry("1100x900")
 
         self.create_widgets()
+        # Charger les 25 dernières soumissions au démarrage
+        self.rechercher()
 
     def create_widgets(self):
         search_frame = ttkb.Frame(self.window)
@@ -91,7 +93,11 @@ class SubmissionSearchWindow:
     def rechercher(self):
         criteres = {k: v.get().strip() for k, v in self.vars.items() if v.get().strip() != ""}
         try:
-            resultats = self.db_manager.search_submissions(criteres)
+            # Charger les 25 dernières soumissions si aucun critère n'est fourni
+            if not criteres:
+                resultats = self.db_manager.search_submissions(criteres, limit=25)  # Ajout d'un paramètre limit
+            else:
+                resultats = self.db_manager.search_submissions(criteres)
             self.tree.delete(*self.tree.get_children())
             for row in resultats:
                 self.tree.insert("", "end", values=row)
@@ -103,11 +109,11 @@ class SubmissionSearchWindow:
         if not item:
             return
         submission_number = self.tree.item(item)['values'][0]
-        print(f"[DEBUG] Numéro de soumission sélectionné : {submission_number}")
+        
         try:
             from gui.submission_form import SubmissionForm
             data = self.db_manager.charger_soumission(submission_number)
-            print(f"[DEBUG] Données chargées : {data}")
+            
             if data:
                 SubmissionForm(self.window, self.db_manager, existing_submission=data)
             else:

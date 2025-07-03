@@ -198,10 +198,12 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
             membrane = self.submission_data.get("membrane", "").strip()
             if membrane and membrane.upper() != "AUCUNE":
                 ws.range("B37").value = membrane
+                ws.range("E38").value = "1/8\""
+                ws.range("E39").value = "1/8\""
                 ws.range("B38").value = "   POSE SANS DIVISIONS"
                 ws.range("B39").value = "   POSE AVEC DIVISIONS"
-                ws.range("E38").value = "PI²"
-                ws.range("E39").value = "PI²"
+                ws.range("I38").value = "PI²"
+                ws.range("I39").value = "PI²"
 
                 try:
                     membrane_data = self.db_manager.get_membrane_by_nom(membrane)

@@ -4,7 +4,35 @@ from contextlib import contextmanager
 def init_database(db_path):
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
-        
+
+
+        # Table chantiers_reels
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chantiers_reels (
+                soumission_reel TEXT PRIMARY KEY,
+                client_reel TEXT,
+                superficie_reel TEXT,
+                produit_reel TEXT,
+                produit_diff TEXT,
+                sable_total_reel TEXT,
+                sable_transporter_reel TEXT,
+                sable_commande_reel TEXT,
+                sacs_utilises_reel TEXT,
+                sable_utilise_reel TEXT,
+                membrane_posee_reel TEXT,
+                nb_rouleaux_installes_reel TEXT,
+                marches_reel TEXT,
+                notes_reel TEXT,
+                date_travaux TEXT,
+                date_soumission TEXT,
+                donnees_json TEXT,
+                adresse_reel TEXT,
+                type_membrane TEXT,
+                nb_sacs_prevus TEXT,
+                thickness TEXT,
+                notes_bureau TEXT
+            )
+        """)
 
         # Table clients
         cursor.execute("""

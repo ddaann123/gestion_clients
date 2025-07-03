@@ -2,16 +2,23 @@ import sqlite3
 from contextlib import contextmanager
 import json
 import os
+import ast
+from datetime import datetime
 
 class DatabaseManager:
     def __init__(self, db_path=None):
         if db_path is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))  # chemin vers gui/
+            base_dir = os.path.dirname(os.path.abspath(__file__))
             db_path = os.path.join(base_dir, "../database/clients.db")
+        else:
+            base_dir = os.path.dirname(os.path.abspath(db_path))
         self.db_path = os.path.abspath(db_path)
+        self.txt_path = os.path.abspath(os.path.join(base_dir, "../donnees_chantier.txt"))
         from .models import init_database
         init_database(self.db_path)
+        self.sync_txt_to_db()
         print(f"[DEBUG] Base de données utilisée : {self.db_path}")
+        print(f"[DEBUG] Fichier texte utilisé : {self.txt_path}")
 
     @contextmanager
     def get_connection(self):
@@ -28,6 +35,287 @@ class DatabaseManager:
     def close(self):
         pass
 
+    def read_txt_file(self):
+        """
+        Lit donnees_chantier.txt, gérant à la fois le format JSON et le format ligne par ligne.
+        Retourne une liste de dictionnaires avec les clés normalisées.
+        """
+        if not os.path.exists(self.txt_path):
+            print(f"[DEBUG] Fichier {self.txt_path} non trouvé")
+            return []
+
+        data = []
+        key_mapping = {
+            "soumission": "soumission_reel",
+            "client": "client_reel",
+            "superficie": "superficie_reel",
+            "produit": "produit_reel",
+            "sable_total": "sable_total_reel",
+            "sable_transporter": "sable_transporter_reel",
+            "sable_commande": "sable_commande_reel",
+            "sacs_utilises": "sacs_utilises_reel",
+            "sable_utilise": "sable_utilise_reel",
+            "membrane_posee": "membrane_posee_reel",
+            "nb_rouleaux_installes": "nb_rouleaux_installes_reel"
+        }
+
+        try:
+            with open(self.txt_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    print(f"[DEBUG] Fichier {self.txt_path} vide")
+                    return []
+
+                # Essayer de parser comme JSON
+                try:
+                    data = json.loads(content)
+                    if not isinstance(data, list):
+                        print(f"[DEBUG] Fichier {self.txt_path} n'est pas une liste JSON")
+                        data = []
+                    else:
+                        # Normaliser les clés pour les entrées JSON
+                        for entry in data:
+                            normalized_entry = {}
+                            for old_key, new_key in key_mapping.items():
+                                normalized_entry[new_key] = entry.get(old_key, entry.get(new_key, ""))
+                            for key in entry:
+                                if key not in key_mapping and key not in normalized_entry:
+                                    normalized_entry[key] = entry[key]
+                            if "donnees_json" not in normalized_entry:
+                                normalized_entry["donnees_json"] = json.dumps({"heures_chantier": normalized_entry.get("heures_chantier", {})})
+                            data[data.index(entry)] = normalized_entry
+                        print(f"[DEBUG] {len(data)} entrées lues depuis {self.txt_path} (format JSON)")
+                        return data
+                except json.JSONDecodeError:
+                    print(f"[DEBUG] Fichier {self.txt_path} n'est pas un JSON valide, tentative de lecture ligne par ligne")
+
+                # Réinitialiser le curseur et lire ligne par ligne
+                f.seek(0)
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = ast.literal_eval(line)
+                        if not isinstance(entry, dict):
+                            print(f"[DEBUG] Ligne ignorée (pas un dictionnaire) : {line[:50]}...")
+                            continue
+                        normalized_entry = {}
+                        for old_key, new_key in key_mapping.items():
+                            normalized_entry[new_key] = entry.get(old_key, "")
+                        for key in entry:
+                            if key not in key_mapping and key not in normalized_entry:
+                                normalized_entry[key] = entry[key]
+                        if "donnees_json" not in normalized_entry:
+                            normalized_entry["donnees_json"] = json.dumps({"heures_chantier": normalized_entry.get("heures_chantier", {})})
+                        data.append(normalized_entry)
+                    except (SyntaxError, ValueError) as e:
+                        print(f"[DEBUG] Erreur de parsing de la ligne : {line[:50]}... ({e})")
+                        continue
+
+                # Réécrire le fichier en JSON valide si des données ont été lues
+                if data:
+                    with open(self.txt_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    print(f"[DEBUG] Fichier {self.txt_path} converti en JSON valide")
+                else:
+                    print(f"[DEBUG] Aucune donnée valide trouvée dans {self.txt_path}")
+
+                print(f"[DEBUG] {len(data)} entrées lues depuis {self.txt_path} (format ligne par ligne)")
+                return data
+        except Exception as e:
+            print(f"[DEBUG] Erreur lors de la lecture de {self.txt_path} : {e}")
+            return []
+
+    def sync_txt_to_db(self):
+        """
+        Synchronise les données de donnees_chantier.txt avec la table chantiers_reels.
+        Supprime les duplicatas en gardant la dernière entrée par soumission_reel.
+        """
+        try:
+            data = self.read_txt_file()
+            if not data:
+                print(f"[DEBUG] Aucun donnée valide dans {self.txt_path}")
+                return
+
+            unique_data = {}
+            for entry in data:
+                soumission_reel = entry.get("soumission_reel")
+                if soumission_reel:
+                    date_travaux = entry.get("date_travaux", "01-01-1900")
+                    try:
+                        date_travaux_dt = datetime.strptime(date_travaux, "%d-%m-%Y")
+                    except ValueError:
+                        date_travaux_dt = datetime(1900, 1, 1)
+                    if soumission_reel not in unique_data or \
+                       date_travaux_dt > datetime.strptime(unique_data[soumission_reel].get("date_travaux", "01-01-1900"), "%d-%m-%Y"):
+                        unique_data[soumission_reel] = entry
+
+            # Réécrire donnees_chantier.txt sans duplicatas
+            with open(self.txt_path, 'w', encoding='utf-8') as f:
+                json.dump(list(unique_data.values()), f, indent=2, ensure_ascii=False)
+            print(f"[DEBUG] Fichier {self.txt_path} mis à jour avec {len(unique_data)} entrées uniques")
+
+            # Vider la table chantiers_reels
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM chantiers_reels")
+                conn.commit()
+
+            # Insérer les données dans chantiers_reels
+            for entry in unique_data.values():
+                self.insert_work_sheet(entry)
+            print(f"[DEBUG] Table chantiers_reels synchronisée avec {len(unique_data)} entrées")
+
+        except Exception as e:
+            print(f"[DEBUG] Erreur lors de la synchronisation de {self.txt_path} vers chantiers_reels : {e}")
+
+    def delete_work_sheet(self, soumission_reel):
+        """
+        Supprime une feuille de travail de chantiers_reels et de donnees_chantier.txt.
+        Retourne True si la suppression est réussie, False sinon.
+        """
+        try:
+            # Supprimer de la table chantiers_reels
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+                conn.commit()
+                if cursor.rowcount > 0:
+                    print(f"[DEBUG] Feuille {soumission_reel} supprimée de chantiers_reels")
+                else:
+                    print(f"[DEBUG] Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}")
+
+            # Supprimer de donnees_chantier.txt
+            data = self.read_txt_file()
+            initial_count = len(data)
+            updated_data = [entry for entry in data if entry.get("soumission_reel") != soumission_reel]
+            if len(updated_data) < initial_count:
+                with open(self.txt_path, 'w', encoding='utf-8') as f:
+                    json.dump(updated_data, f, indent=2, ensure_ascii=False)
+                print(f"[DEBUG] Feuille {soumission_reel} supprimée de {self.txt_path}")
+                return True
+            else:
+                print(f"[DEBUG] Aucune feuille trouvée dans {self.txt_path} pour soumission_reel={soumission_reel}")
+                # Si aucune donnée n'a été lue à cause d'un format incorrect, forcer la réécriture du fichier
+                if not data:
+                    with open(self.txt_path, 'w', encoding='utf-8') as f:
+                        json.dump([], f, indent=2, ensure_ascii=False)
+                    print(f"[DEBUG] Fichier {self.txt_path} réinitialisé à vide en raison d'un format incorrect")
+                    return True
+                return False
+        except Exception as e:
+            print(f"[DEBUG] Erreur lors de la suppression de {soumission_reel} : {e}")
+            return False
+
+    def search_work_sheets(self, criteres=None, limit=None):
+        """
+        Recherche les feuilles de travail dans chantiers_reels selon les critères fournis.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT soumission_reel, client_reel, adresse_reel, date_travaux, date_soumission
+                FROM chantiers_reels
+                WHERE 1=1
+            """
+            params = []
+            if criteres:
+                for key, value in criteres.items():
+                    query += f" AND {key} LIKE ?"
+                    params.append(f"%{value}%")
+            query += " ORDER BY date_travaux DESC"
+            if limit:
+                query += f" LIMIT ?"
+                params.append(limit)
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            print(f"[DEBUG] Résultats bruts de search_work_sheets : {results}")
+            return results
+
+    def charger_feuille(self, soumission_reel):
+        """
+        Charge les données d'une feuille de travail depuis chantiers_reels.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+            row = cursor.fetchone()
+            if not row:
+                print(f"[DEBUG] Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}")
+                return None
+            colonnes = [desc[0] for desc in cursor.description]
+            data = dict(zip(colonnes, row))
+            print(f"[DEBUG] Feuille chargée pour soumission_reel={soumission_reel} : {data}")
+            return data
+
+    def insert_work_sheet(self, data):
+        """
+        Insère une feuille de travail dans chantiers_reels et met à jour donnees_chantier.txt.
+        """
+        columns = [
+            "soumission_reel", "client_reel", "superficie_reel", "produit_reel", "produit_diff",
+            "sable_total_reel", "sable_transporter_reel", "sable_commande_reel", "sacs_utilises_reel",
+            "sable_utilise_reel", "membrane_posee_reel", "nb_rouleaux_installes_reel", "marches_reel",
+            "notes_reel", "date_travaux", "date_soumission", "donnees_json", "adresse_reel",
+            "type_membrane", "nb_sacs_prevus", "thickness", "notes_bureau"
+        ]
+        default_values = {
+            "soumission_reel": "",
+            "client_reel": "",
+            "superficie_reel": "",
+            "produit_reel": "",
+            "produit_diff": "",
+            "sable_total_reel": "",
+            "sable_transporter_reel": "",
+            "sable_commande_reel": "",
+            "sacs_utilises_reel": "",
+            "sable_utilise_reel": "",
+            "membrane_posee_reel": "",
+            "nb_rouleaux_installes_reel": "",
+            "marches_reel": "",
+            "notes_reel": "",
+            "date_travaux": "",
+            "date_soumission": "",
+            "donnees_json": json.dumps({"heures_chantier": data.get("heures_chantier", {})}),
+            "adresse_reel": "",
+            "type_membrane": "",
+            "nb_sacs_prevus": "",
+            "thickness": "",
+            "notes_bureau": ""
+        }
+        try:
+            values = [data.get(col, default_values[col]) for col in columns]
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = f"""
+                    INSERT OR REPLACE INTO chantiers_reels ({", ".join(columns)})
+                    VALUES ({", ".join(["?" for _ in columns])})
+                """
+                cursor.execute(query, values)
+                conn.commit()
+                print(f"[DEBUG] Feuille insérée/mise à jour dans chantiers_reels : {data.get('soumission_reel')}")
+
+            # Mettre à jour donnees_chantier.txt
+            txt_data = self.read_txt_file()
+            txt_data = [entry for entry in txt_data if entry.get("soumission_reel") != data.get("soumission_reel")]
+            txt_data.append(data)
+            with open(self.txt_path, 'w', encoding='utf-8') as f:
+                json.dump(txt_data, f, indent=2, ensure_ascii=False)
+            print(f"[DEBUG] Feuille insérée/mise à jour dans {self.txt_path} : {data.get('soumission_reel')}")
+
+        except Exception as e:
+            print(f"[DEBUG] Erreur lors de l'insertion de {data.get('soumission_reel')} : {e}")
+
+    # Les autres méthodes restent inchangées
+    def get_produits(self):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT nom FROM produits")
+            return [row[0] for row in cursor.fetchall()]
+    # ... (autres méthodes comme get_sable, add_sable, etc., restent inchangées)
+
+    
     def get_produits(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -174,7 +462,6 @@ class DatabaseManager:
             conn.commit()
 
     def get_produit_details(self):
-        """Récupère tous les détails des produits."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -184,7 +471,6 @@ class DatabaseManager:
             return cursor.fetchall()
 
     def get_produit_ratios(self, produit_nom):
-        """Récupère les ratios et la valeur par défaut pour un produit."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -195,7 +481,6 @@ class DatabaseManager:
             return cursor.fetchall()
 
     def add_produit(self, nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce, ratios=None):
-        """Ajoute un produit et ses ratios (si type Ratio)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             try:
@@ -223,7 +508,6 @@ class DatabaseManager:
                 raise e
 
     def update_produit(self, old_nom, nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce, ratios=None):
-        """Met à jour un produit et ses ratios (si type Ratio)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             try:
@@ -233,10 +517,8 @@ class DatabaseManager:
                     WHERE nom = ?
                 """, (nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce, old_nom))
                 
-                # Supprimer les anciens ratios
                 cursor.execute("DELETE FROM produit_ratios WHERE produit_nom = ?", (old_nom,))
                 
-                # Ajouter les nouveaux ratios si type Ratio
                 if type_produit == "RATIO" and ratios:
                     if len(ratios) < 1:
                         raise ValueError("Au moins un ratio est requis pour un produit de type Ratio")
@@ -256,7 +538,6 @@ class DatabaseManager:
                 raise e
 
     def delete_produit(self, nom):
-        """Supprime un produit (les ratios sont supprimés automatiquement via CASCADE)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM produits WHERE nom = ?", (nom,))
@@ -279,7 +560,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si la contrainte CHECK est violée
+            return False
 
     def update_pension(self, pension_id, type_pension, montant_par_jour):
         try:
@@ -292,7 +573,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si la contrainte CHECK est violée
+            return False
 
     def delete_pension(self, pension_id):
         with self.get_connection() as conn:
@@ -317,7 +598,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si une contrainte est violée
+            return False
 
     def update_machinerie(self, machinerie_id, type_machinerie, taux_horaire):
         try:
@@ -330,7 +611,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si une contrainte est violée
+            return False
 
     def delete_machinerie(self, machinerie_id):
         with self.get_connection() as conn:
@@ -355,7 +636,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si une contrainte est violée
+            return False
 
     def update_apprets_scellants(self, apprets_scellants_id, nom_produit, prix, format_litres, couverture_pi2):
         try:
@@ -368,7 +649,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si une contrainte est violée
+            return False
 
     def delete_apprets_scellants(self, apprets_scellants_id):
         with self.get_connection() as conn:
@@ -393,7 +674,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si une contrainte est violée
+            return False
 
     def update_membranes(self, membranes_id, modele_membrane, couverture_pi2, prix_rouleau, prix_pi2_membrane, pose_pi2_sans_divisions, pose_pi2_avec_divisions):
         try:
@@ -406,7 +687,7 @@ class DatabaseManager:
                 conn.commit()
                 return True
         except sqlite3.IntegrityError:
-            return False  # Retourne False si une contrainte est violée
+            return False
 
     def delete_membranes(self, membranes_id):
         with self.get_connection() as conn:
@@ -432,62 +713,43 @@ class DatabaseManager:
                 else:
                     raise
 
-    def search_submissions(self, filters):
-        """
-        Recherche les soumissions selon les filtres fournis.
-        filters : dict avec des clés parmi :
-            - submission_number
-            - client_name
-            - contact
-            - projet
-            - ville
-            - etat
-            - date_debut
-            - date_fin
-        """
+    def search_submissions(self, filters, limit=None):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-
             query = """
                 SELECT submission_number, client_name, contact, projet, ville, etat, date_submission
                 FROM submissions
                 WHERE 1=1
             """
-
             params = []
-
             if filters.get("submission_number"):
                 query += " AND submission_number LIKE ?"
                 params.append(f"%{filters['submission_number']}%")
-
             if filters.get("client_name"):
                 query += " AND client_name LIKE ?"
                 params.append(f"%{filters['client_name']}%")
-
             if filters.get("contact"):
                 query += " AND contact LIKE ?"
                 params.append(f"%{filters['contact']}%")
-
             if filters.get("projet"):
                 query += " AND projet LIKE ?"
                 params.append(f"%{filters['projet']}%")
-
             if filters.get("ville"):
                 query += " AND ville LIKE ?"
                 params.append(f"%{filters['ville']}%")
-
             if filters.get("etat") in ("brouillon", "finalisé"):
                 query += " AND etat = ?"
                 params.append(filters["etat"])
-
             if filters.get("date_debut"):
                 query += " AND date_submission >= ?"
                 params.append(filters["date_debut"])
-
             if filters.get("date_fin"):
                 query += " AND date_submission <= ?"
                 params.append(filters["date_fin"])
-
+            query += " ORDER BY date_submission DESC"
+            if limit is not None:
+                query += " LIMIT ?"
+                params.append(limit)
             cursor.execute(query, params)
             return cursor.fetchall()
 
@@ -500,8 +762,6 @@ class DatabaseManager:
             row = cursor.fetchone()
             if not row:
                 return None
-
-            # Récupère les noms des colonnes pour retourner un dictionnaire
             colonnes = [desc[0] for desc in cursor.description]
             data = dict(zip(colonnes, row))
             return data
@@ -547,50 +807,145 @@ class DatabaseManager:
                 for row in rows
             ]
 
-    def search_work_sheets(self, criteres=None, limit=None):
-        """
-        Recherche les feuilles de travail dans chantiers_reels selon les critères fournis.
-        criteres : dict avec des clés parmi : soumission_reel, client_reel, adresse_reel, date_travaux, date_soumission
-        limit : nombre maximum de résultats à retourner (par exemple, 25 pour les dernières feuilles)
-        """
+    def get_submission_by_number(self, submission_number):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM submissions WHERE submission_number = ? AND is_active = 1
+            """, (submission_number,))
+            return cursor.fetchone()
+
+    def update_submission(self, submission_number, data):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             query = """
-                SELECT soumission_reel, client_reel, adresse_reel, date_travaux, date_soumission
-                FROM chantiers_reels
-                WHERE 1=1
+                UPDATE submissions
+                SET revision = ?,
+                    is_active = ?,
+                    etat = ?,
+                    year = ?,
+                    sequence = ?,
+                    date_submission = ?,
+                    client_name = ?,
+                    contact = ?,
+                    projet = ?,
+                    ville = ?,
+                    distance = ?,
+                    area = ?,
+                    product = ?,
+                    ratio = ?,
+                    usd_cad_rate = ?,
+                    thickness = ?,
+                    subfloor = ?,
+                    membrane = ?,
+                    pose_membrane = ?,
+                    sealant = ?,
+                    prix_par_sac = ?,
+                    total_sacs = ?,
+                    prix_total_sacs = ?,
+                    sable_total = ?,
+                    voyages_sable = ?,
+                    prix_total_sable = ?,
+                    mobilisations = ?,
+                    surface_per_mob = ?,
+                    type_main = ?,
+                    type_pension = ?,
+                    type_machinerie = ?,
+                    nb_hommes = ?,
+                    heures_chantier = ?,
+                    heures_transport = ?,
+                    prix_total_pension = ?,
+                    prix_total_machinerie = ?,
+                    prix_total_heures_chantier = ?,
+                    prix_total_heures_transport = ?,
+                    ajustement1_nom = ?,
+                    ajustement1_valeur = ?,
+                    ajustement2_nom = ?,
+                    ajustement2_valeur = ?,
+                    ajustement3_nom = ?,
+                    ajustement3_valeur = ?,
+                    reperes_nivellement = ?,
+                    sous_total_ajustements = ?,
+                    sous_total_fournisseurs = ?,
+                    sous_total_main_machinerie = ?,
+                    total_prix_coutants = ?,
+                    admin_profit_pct = ?,
+                    admin_profit_montant = ?,
+                    prix_vente_client = ?,
+                    prix_unitaire = ?,
+                    prix_total_immeuble = ?,
+                    prix_pi2_ajuste = ?,
+                    prix_total_ajuste = ?,
+                    notes_json = ?,
+                    surfaces_json = ?,
+                    sable_transporter = ?,
+                    truck_tonnage = ?,
+                    transport_sector = ?
+                WHERE submission_number = ?
             """
-            params = []
-            if criteres:
-                for key, value in criteres.items():
-                    query += f" AND {key} LIKE ?"
-                    params.append(f"%{value}%")
-            query += " ORDER BY date_soumission DESC"
-            if limit:
-                query += f" LIMIT {limit}"
+            params = [
+                data["revision"],
+                data["is_active"],
+                data["etat"],
+                data["year"],
+                data["sequence"],
+                data["date_submission"],
+                data["client_name"],
+                data["contact"],
+                data["projet"],
+                data["ville"],
+                data["distance"],
+                data["area"],
+                data["product"],
+                data["ratio"],
+                data["usd_cad_rate"],
+                data["thickness"],
+                data["subfloor"],
+                data["membrane"],
+                data["pose_membrane"],
+                data["sealant"],
+                data["prix_par_sac"],
+                data["total_sacs"],
+                data["prix_total_sacs"],
+                data["sable_total"],
+                data["voyages_sable"],
+                data["prix_total_sable"],
+                data["mobilisations"],
+                data["surface_per_mob"],
+                data["type_main"],
+                data["type_pension"],
+                data["type_machinerie"],
+                data["nb_hommes"],
+                data["heures_chantier"],
+                data["heures_transport"],
+                data["prix_total_pension"],
+                data["prix_total_machinerie"],
+                data["prix_total_heures_chantier"],
+                data["prix_total_heures_transport"],
+                data["ajustement1_nom"],
+                data["ajustement1_valeur"],
+                data["ajustement2_nom"],
+                data["ajustement2_valeur"],
+                data["ajustement3_nom"],
+                data["ajustement3_valeur"],
+                data["reperes_nivellement"],
+                data["sous_total_ajustements"],
+                data["sous_total_fournisseurs"],
+                data["sous_total_main_machinerie"],
+                data["total_prix_coutants"],
+                data["admin_profit_pct"],
+                data["admin_profit_montant"],
+                data["prix_vente_client"],
+                data["prix_unitaire"],
+                data["prix_total_immeuble"],
+                data["prix_pi2_ajuste"],
+                data["prix_total_ajuste"],
+                data["notes_json"],
+                data["surfaces_json"],
+                data["sable_transporter"],
+                data["truck_tonnage"],
+                data["transport_sector"],
+                submission_number
+            ]
             cursor.execute(query, params)
-            return cursor.fetchall()
-
-    def delete_work_sheet(self, soumission_reel):
-        """
-        Supprime une feuille de travail de la table chantiers_reels.
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
             conn.commit()
-
-    def charger_feuille(self, soumission_reel):
-        """
-        Charge les données d'une feuille de travail depuis chantiers_reels.
-        Retourne un dictionnaire avec les colonnes et leurs valeurs.
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
-            row = cursor.fetchone()
-            if not row:
-                return None
-            colonnes = [desc[0] for desc in cursor.description]
-            data = dict(zip(colonnes, row))
-            return data
