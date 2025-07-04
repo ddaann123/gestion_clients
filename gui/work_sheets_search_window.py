@@ -8,6 +8,7 @@ import tkinter as tk
 
 from gui.cost_calculator import CostCalculatorWindow
 
+
 class WorkSheetsSearchWindow:
     def __init__(self, parent, db_manager):
         self.db_manager = db_manager
@@ -119,19 +120,19 @@ class WorkSheetsSearchWindow:
             data = self.db_manager.charger_feuille(soumission_reel)
             
             if data:
-                WorkSheetDetailsWindow(self.window, data)
+                WorkSheetDetailsWindow(self.window, data, self.db_manager)  # Passer db_manager
             else:
                 Messagebox.show_error(f"Feuille introuvable")
         except Exception as e:
             Messagebox.show_error(f"Erreur lors de l'ouverture : {e}")
 
 class WorkSheetDetailsWindow:
-    def __init__(self, parent, data):
+    def __init__(self, parent, data, db_manager):
         self.data = data
+        self.db_manager = db_manager  # Ajouter db_manager
         self.window = ttkb.Toplevel(parent)
         self.window.title(f"Détails de la feuille - {data['soumission_reel']}")
         self.window.geometry("1200x900")
-        
 
         # Canvas avec scrollbar
         canvas = ttkb.Canvas(self.window)
@@ -179,7 +180,7 @@ class WorkSheetDetailsWindow:
         ttkb.Button(
             self.scrollable_frame,
             text="Calculer prix coûtant",
-            command=lambda: CostCalculatorWindow(self.window, self.data),
+            command=lambda: CostCalculatorWindow(self.window, self.data, self.db_manager),
             bootstyle="primary"
         ).pack(pady=10)
 
@@ -408,7 +409,6 @@ class WorkSheetDetailsWindow:
         heures_chantier = json.loads(self.data.get("donnees_json", "{}")).get("heures_chantier", {})
         employes = list(heures_chantier.keys()) + [""] * (11 - len(heures_chantier))
         
-
         headers = ["Employé", "Présence", "Véhicule", "Chauffeur Aller", "Chauffeur Retour", "Heure Début", "Heure Fin", "Total Heures", "Temps Transport", "Heures Entrepôt"]
         for col, header in enumerate(headers):
             tk.Label(parent, text=header, font=("Arial", 10, "bold"), borderwidth=1, relief="solid").grid(row=0, column=col, padx=2, pady=2, sticky="nsew")
@@ -450,7 +450,6 @@ class WorkSheetDetailsWindow:
                 heures_entrepot
             ]
             
-
             for col, value in enumerate(values):
                 tk.Label(parent, text=value, borderwidth=1, relief="solid").grid(row=i, column=col, padx=2, pady=2, sticky="nsew")
 

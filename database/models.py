@@ -56,6 +56,21 @@ def init_database(db_path):
                 FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
             )
         """)
+
+        # Table costs
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS costs (
+                submission_number TEXT PRIMARY KEY,
+                date_travaux TEXT,
+                client TEXT,
+                adresse TEXT,
+                surface REAL,
+                facture_no TEXT,
+                montant_facture_av_tx REAL,
+                total_reel REAL,
+                profit REAL
+            )
+        """)
         
         # Table produits
         cursor.execute("""
@@ -256,3 +271,4 @@ def migrer_table_submissions_si_necessaire(conn):
 
     conn.commit()
 
+    

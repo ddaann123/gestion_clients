@@ -4,6 +4,7 @@ import json
 import os
 import ast
 from datetime import datetime
+import logging
 
 class DatabaseManager:
     def __init__(self, db_path=None):
@@ -949,3 +950,142 @@ class DatabaseManager:
             ]
             cursor.execute(query, params)
             conn.commit()
+
+    def get_submission_details(self, submission_number, columns):
+        """
+        Récupère les valeurs des colonnes spécifiées pour une soumission donnée.
+        Args:
+            submission_number (str): Le numéro de soumission (ex. 'S25-214').
+            columns (list): Liste des colonnes à récupérer (ex. ['product', 'total_sacs']).
+        Returns:
+            dict: Dictionnaire avec les colonnes demandées et leurs valeurs, ou None si non trouvé.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            # Construire la liste des colonnes pour la requête
+            columns_str = ", ".join(columns)
+            query = f"""
+                SELECT {columns_str}
+                FROM submissions
+                WHERE submission_number = ? AND is_active = 1
+            """
+            try:
+                cursor.execute(query, (submission_number,))
+                result = cursor.fetchone()
+                if result:
+                    # Retourner un dictionnaire avec les colonnes comme clés
+                    return dict(zip(columns, result))
+                return {}
+            except sqlite3.Error as e:
+                print(f"[ERREUR] Impossible de récupérer les détails de la soumission {submission_number} : {e}")
+                return {}
+            
+
+
+
+    def save_costs(self, submission_number, date_travaux, client, adresse, surface, facture_no, montant_facture_av_tx, total_reel, profit):
+        """Sauvegarde les données dans la table costs."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT OR REPLACE INTO costs (
+                        submission_number, date_travaux, client, adresse, surface,
+                        facture_no, montant_facture_av_tx, total_reel, profit
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    submission_number, date_travaux, client, adresse, surface,
+                    facture_no, montant_facture_av_tx, total_reel, profit
+                ))
+                conn.commit()
+                logging.info(f"Données sauvegardées pour submission_number={submission_number}")
+        except Exception as e:
+            logging.error(f"Erreur lors de la sauvegarde dans la table costs : {e}")
+            raise
+
+    def get_main_doeuvre_details(self, metier):
+        """Récupère taux_horaire_chantier et taux_horaire_transport depuis la table main_doeuvre."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT taux_horaire_chantier, taux_horaire_transport FROM main_doeuvre WHERE metier = ?", (metier,))
+                result = cursor.fetchone()
+                return {
+                    "taux_horaire_chantier": result[0] if result else 0.0,
+                    "taux_horaire_transport": result[1] if result else 0.0
+                }
+        except Exception as e:
+            logging.error(f"Erreur dans get_main_doeuvre_details: {e}")
+            return {"taux_horaire_chantier": 0.0, "taux_horaire_transport": 0.0}
+
+    def get_machinerie_details(self, type_machinerie):
+        """Récupère taux_horaire depuis la table machinerie."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT taux_horaire FROM machinerie WHERE type_machinerie = ?", (type_machinerie,))
+                result = cursor.fetchone()
+                return {"taux_horaire": result[0] if result else 0.0}
+        except Exception as e:
+            logging.error(f"Erreur dans get_machinerie_details: {e}")
+            return {"taux_horaire": 0.0}
+
+    def get_appret_details(self):
+        """Récupère les détails des apprêts depuis la table apprets_scellants."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT nom_produit, couverture_pi2, prix FROM apprets_scellants")
+                return cursor.fetchall()
+        except Exception:
+            return []
+
+    def get_membrane_details(self):
+        """Récupère les détails des membranes depuis la table membranes."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT modele_membrane, couverture_pi2, prix_rouleau FROM membranes")
+                return cursor.fetchall()
+        except Exception:
+            return []
+
+    def get_submission_details(self, submission_number):
+        """Récupère les détails d'une soumission depuis la table submissions."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                columns = ["product", "prix_par_sac", "sable_transporter", "truck_tonnage", 
+                           "transport_sector", "sealant", "prix_total_heures_chantier", 
+                           "prix_total_heures_transport", "prix_total_machinerie", 
+                           "prix_total_pension", "type_main", "type_machinerie"]
+                query = f"SELECT {', '.join(columns)} FROM submissions WHERE submission_number = ?"
+                cursor.execute(query, (submission_number,))
+                result = cursor.fetchone()
+                if result:
+                    return dict(zip(columns, result))
+                logging.warning(f"Aucune soumission trouvée pour submission_number={submission_number}")
+                return {}
+        except Exception as e:
+            logging.error(f"Erreur dans get_submission_details: {e}")
+            return {}
+
+    def get_sable(self):
+        """Récupère les données de la table sable."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM sable")
+                return cursor.fetchall()
+        except Exception:
+            return []
+
+    def get_produit_details(self):
+        """Récupère les détails des produits depuis la table produits."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT nom, prix_base, devise_base, prix_transport, devise_transport FROM produits")
+                return cursor.fetchall()
+        except Exception:
+            return []
