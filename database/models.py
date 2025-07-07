@@ -57,10 +57,11 @@ def init_database(db_path):
             )
         """)
 
-        # Table costs
+        # Table costs avec clé primaire auto-incrémentée et contrainte UNIQUE
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS costs (
-                submission_number TEXT PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                submission_number TEXT,
                 date_travaux TEXT,
                 client TEXT,
                 adresse TEXT,
@@ -68,10 +69,12 @@ def init_database(db_path):
                 facture_no TEXT,
                 montant_facture_av_tx REAL,
                 total_reel REAL,
-                profit REAL
+                profit REAL,
+                UNIQUE(submission_number, date_travaux)
             )
         """)
         
+
         # Table produits
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS produits (

@@ -308,13 +308,7 @@ class DatabaseManager:
         except Exception as e:
             print(f"[DEBUG] Erreur lors de l'insertion de {data.get('soumission_reel')} : {e}")
 
-    # Les autres méthodes restent inchangées
-    def get_produits(self):
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT nom FROM produits")
-            return [row[0] for row in cursor.fetchall()]
-    # ... (autres méthodes comme get_sable, add_sable, etc., restent inchangées)
+
 
     
     def get_produits(self):
@@ -463,23 +457,33 @@ class DatabaseManager:
             conn.commit()
 
     def get_produit_details(self):
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce
-                FROM produits
-            """)
-            return cursor.fetchall()
+        """Récupère les détails des produits depuis la table produits."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce
+                    FROM produits
+                """)
+                return cursor.fetchall()
+        except Exception as e:
+            logging.error(f"Erreur lors de la récupération des détails des produits : {e}")
+            return []
 
     def get_produit_ratios(self, produit_nom):
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, ratio, est_defaut
-                FROM produit_ratios
-                WHERE produit_nom = ?
-            """, (produit_nom,))
-            return cursor.fetchall()
+        """Récupère les ratios des produits depuis la table produit_ratios."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, ratio, est_defaut
+                    FROM produit_ratios
+                    WHERE produit_nom = ?
+                """, (produit_nom,))
+                return cursor.fetchall()
+        except Exception as e:
+            logging.error(f"Erreur lors de la récupération des ratios des produits : {e}")
+            return []
 
     def add_produit(self, nom, prix_base, devise_base, prix_transport, devise_transport, type_produit, couverture_1_pouce, ratios=None):
         with self.get_connection() as conn:
@@ -983,13 +987,27 @@ class DatabaseManager:
 
 
 
+    def check_cost_exists(self, submission_number, date_travaux):
+        """Vérifie si une entrée existe dans la table costs pour submission_number et date_travaux."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT id FROM costs WHERE submission_number = ? AND date_travaux = ?",
+                    (submission_number, date_travaux)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logging.error(f"Erreur lors de la vérification de l'existence du coût : {e}")
+            return False
+
     def save_costs(self, submission_number, date_travaux, client, adresse, surface, facture_no, montant_facture_av_tx, total_reel, profit):
         """Sauvegarde les données dans la table costs."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT OR REPLACE INTO costs (
+                    INSERT INTO costs (
                         submission_number, date_travaux, client, adresse, surface,
                         facture_no, montant_facture_av_tx, total_reel, profit
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -998,9 +1016,98 @@ class DatabaseManager:
                     facture_no, montant_facture_av_tx, total_reel, profit
                 ))
                 conn.commit()
-                logging.info(f"Données sauvegardées pour submission_number={submission_number}")
+                logging.info(f"Données sauvegardées pour submission_number={submission_number}, date_travaux={date_travaux}")
+        except sqlite3.IntegrityError as e:
+            logging.error(f"Erreur d'intégrité lors de la sauvegarde dans la table costs : {e}")
+            raise
         except Exception as e:
             logging.error(f"Erreur lors de la sauvegarde dans la table costs : {e}")
+            raise
+
+    def get_recent_costs(self, limit=25):
+        """Récupère les limit derniers enregistrements de la table costs."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT submission_number, date_travaux, client, adresse, surface,
+                           facture_no, montant_facture_av_tx, total_reel, profit
+                    FROM costs
+                    ORDER BY date_travaux DESC
+                    LIMIT ?
+                """, (limit,))
+                return cursor.fetchall()
+        except Exception as e:
+            logging.error(f"Erreur lors de la récupération des coûts : {e}")
+            return []
+
+    def search_costs(self, submission_number="", facture_no="", client="", adresse="", date_from="", date_to=""):
+        """Recherche les coûts selon les critères donnés."""
+        try:
+            query = """
+                SELECT submission_number, date_travaux, client, adresse, surface,
+                       facture_no, montant_facture_av_tx, total_reel, profit
+                FROM costs
+                WHERE 1=1
+            """
+            params = []
+            if submission_number:
+                query += " AND submission_number LIKE ?"
+                params.append(f"%{submission_number}%")
+            if facture_no:
+                query += " AND facture_no LIKE ?"
+                params.append(f"%{facture_no}%")
+            if client:
+                query += " AND client LIKE ?"
+                params.append(f"%{client}%")
+            if adresse:
+                query += " AND adresse LIKE ?"
+                params.append(f"%{adresse}%")
+            if date_from:
+                query += " AND date_travaux >= ?"
+                params.append(date_from)
+            if date_to:
+                query += " AND date_travaux <= ?"
+                params.append(date_to)
+            query += " ORDER BY date_travaux DESC"
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                return cursor.fetchall()
+        except Exception as e:
+            logging.error(f"Erreur lors de la recherche des coûts : {e}")
+            return []
+
+    def delete_cost(self, submission_number):
+        """Supprime un enregistrement de la table costs."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM costs WHERE submission_number = ?", (submission_number,))
+                conn.commit()
+                logging.info(f"Coût supprimé pour submission_number={submission_number}")
+        except Exception as e:
+            logging.error(f"Erreur lors de la suppression du coût : {e}")
+            raise
+
+    def update_cost(self, submission_number, client, adresse, date_travaux, facture_no, montant_facture_av_tx, total_reel, profit):
+        """Met à jour un enregistrement dans la table costs."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE costs
+                    SET client = ?, adresse = ?, date_travaux = ?, facture_no = ?,
+                        montant_facture_av_tx = ?, total_reel = ?, profit = ?
+                    WHERE submission_number = ?
+                """, (
+                    client, adresse, date_travaux, facture_no,
+                    montant_facture_av_tx, total_reel, profit, submission_number
+                ))
+                conn.commit()
+                logging.info(f"Coût mis à jour pour submission_number={submission_number}")
+        except Exception as e:
+            logging.error(f"Erreur lors de la mise à jour du coût : {e}")
             raise
 
     def get_main_doeuvre_details(self, metier):
@@ -1080,12 +1187,3 @@ class DatabaseManager:
         except Exception:
             return []
 
-    def get_produit_details(self):
-        """Récupère les détails des produits depuis la table produits."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT nom, prix_base, devise_base, prix_transport, devise_transport FROM produits")
-                return cursor.fetchall()
-        except Exception:
-            return []

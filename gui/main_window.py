@@ -7,7 +7,8 @@ from tkinter import ttk, messagebox
 from gui.client_form import ClientForm
 from gui.client_details import ClientDetails
 from gui.parameters_window import ParametersWindow
-from gui.work_sheets_search_window import WorkSheetsSearchWindow  # Nouveau import
+from gui.work_sheets_search_window import WorkSheetsSearchWindow
+from gui.contract_costs_window import ContractCostsWindow  # Nouveau import
 
 class MainWindow:
     def __init__(self, root, db_manager):
@@ -69,6 +70,7 @@ class MainWindow:
         gestion_frame = ttk.LabelFrame(main_frame, text="Gestion", padding=10)
         gestion_frame.pack(fill="x", pady=5)
         tk.Button(gestion_frame, text="Gestion des paramètres", command=self.open_parameters).pack(side="left", padx=5)
+        tk.Button(gestion_frame, text="Coûts de contrat", command=self.open_contract_costs).pack(side="left", padx=5)
 
         # Charger la liste initiale
         self.load_clients()
@@ -79,6 +81,10 @@ class MainWindow:
 
     def open_work_sheets(self):
         WorkSheetsSearchWindow(self.root, self.db_manager)
+
+    def open_contract_costs(self):
+        """Ouvre la fenêtre des coûts de contrat."""
+        ContractCostsWindow(self.root, self.db_manager)
 
     def load_clients(self, clients=None):
         """Charge ou actualise la liste des clients dans le Treeview."""

@@ -767,22 +767,27 @@ class CostCalculatorWindow:
             }
             table_product_name = product_mapping.get(product_name, product_name)
             if table_product_name is None:
+                logging.debug(f"Aucun produit correspondant pour {product_name}")
                 return "0.00"
             usd_cad_rate = float(usd_cad_rate)
             produits = db_manager.get_produit_details()
             produit = next((p for p in produits if p[0] == table_product_name), None)
             if not produit:
+                logging.debug(f"Produit {table_product_name} non trouvé dans la table produits")
                 return "0.00"
-            nom, prix_base, devise_base, prix_transport, devise_transport = produit
+            # Déstructurer les 7 colonnes, en ignorant type_produit et couverture_1_pouce
+            nom, prix_base, devise_base, prix_transport, devise_transport, _, _ = produit
             prix_base_cad = prix_base * usd_cad_rate if devise_base == "USD" else prix_base
             prix_transport_cad = prix_transport * usd_cad_rate if devise_transport == "USD" else prix_transport
             total = prix_base_cad + prix_transport_cad
+            logging.debug(f"Prix par sac pour {nom}: prix_base={prix_base_cad:.2f}, prix_transport={prix_transport_cad:.2f}, total={total:.2f}")
             return f"{total:.2f}"
-        except Exception:
+        except Exception as e:
+            logging.error(f"Erreur dans calculate_prix_par_sac pour {product_name}: {e}")
             return "Erreur"
 
     def save_to_table(self):
-        """Sauvegarde les données dans la table costs."""
+        """Sauvegarde les données dans la table costs avec vérification des doublons et mise à jour de est_calcule."""
         try:
             # Récupérer les données des champs
             submission_number = self.widgets["Soumission"].get()
@@ -810,6 +815,28 @@ class CostCalculatorWindow:
             if not submission_number:
                 tk.messagebox.showerror("Erreur", "Le numéro de soumission est requis.")
                 return
+            if not date_travaux:
+                tk.messagebox.showerror("Erreur", "La date des travaux est requise.")
+                return
+
+            # Vérifier si une entrée existe déjà pour ce submission_number et date_travaux
+            if self.db_manager.check_cost_exists(submission_number, date_travaux):
+                if not tk.messagebox.askyesno(
+                    "Avertissement",
+                    f"Une entrée existe déjà pour le numéro de soumission {submission_number} et la date {date_travaux}. "
+                    "Voulez-vous écraser les données existantes ?"
+                ):
+                    tk.messagebox.showinfo("Annulé", "Les données n'ont pas été sauvegardées.")
+                    return
+                # Supprimer l'entrée existante avant d'insérer la nouvelle
+                with self.db_manager.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "DELETE FROM costs WHERE submission_number = ? AND date_travaux = ?",
+                        (submission_number, date_travaux)
+                    )
+                    conn.commit()
+                    logging.info(f"Entrée existante supprimée pour submission_number={submission_number}, date_travaux={date_travaux}")
 
             # Sauvegarder dans la table costs
             self.db_manager.save_costs(
@@ -824,9 +851,22 @@ class CostCalculatorWindow:
                 profit=profit
             )
 
-            tk.messagebox.showinfo("Succès", f"Données sauvegardées pour la soumission {submission_number}.")
-            self.window.destroy()  # Fermer la fenêtre après sauvegarde
+            # Mettre à jour est_calcule dans chantiers_reels
+            with self.db_manager.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE chantiers_reels SET est_calcule = 1 WHERE submission_number = ?",
+                    (submission_number,)
+                )
+                conn.commit()
+                logging.info(f"chantiers_reels mis à jour: est_calcule=1 pour submission_number={submission_number}")
 
+            tk.messagebox.showinfo("Succès", f"Données sauvegardées pour la soumission {submission_number}, date {date_travaux}.")
+            self.window.destroy()
+
+        except sqlite3.IntegrityError:
+            logging.error(f"Erreur d'intégrité : combinaison submission_number={submission_number}, date_travaux={date_travaux} déjà existante.")
+            tk.messagebox.showerror("Erreur", f"Une entrée existe déjà pour la soumission {submission_number} et la date {date_travaux}.")
         except Exception as e:
             logging.error(f"Erreur dans save_to_table : {e}")
             tk.messagebox.showerror("Erreur", f"Erreur lors de la sauvegarde : {str(e)}")

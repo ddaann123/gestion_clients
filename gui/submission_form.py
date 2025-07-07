@@ -1,6 +1,7 @@
 from ttkbootstrap import ttk
 
 import tkinter as tk
+import re
 import json
 from tkinter import messagebox
 from datetime import datetime
@@ -12,6 +13,7 @@ from .submission_calcs import (calculate_distance, calculate_surface_per_mob, ge
 from gui.export_devis import ExportDevisWindow
 from gui.select_contact_window import ContactSelector
 from gui.export_feuille_travail import ExportFeuilleTravailWindow
+from gui.utils import validate_date, validate_date_on_focusout, check_date_on_save
 
 
 
@@ -370,8 +372,11 @@ class SubmissionForm:
         # Champ Date de soumission
         tk.Label(gen_frame, text="Date de soumission (JJ-MM-AAAA) :").grid(row=2, column=0, padx=5, pady=5, sticky="w")
         self.date_var = tk.StringVar()
-        self.date_var.set(datetime.now().strftime("%d-%m-%Y"))  # Date par défaut : 11-06-2025
-        tk.Entry(gen_frame, textvariable=self.date_var, width=30).grid(row=2, column=1, padx=5, pady=5)
+        self.date_var.set(datetime.now().strftime("%d-%m-%Y"))  # Date par défaut : 05-07-2025
+        date_entry = tk.Entry(gen_frame, textvariable=self.date_var, width=30)
+        date_entry.grid(row=2, column=1, padx=5, pady=5)
+        date_entry.configure(validate="key", validatecommand=(self.window.register(validate_date), "%P"))
+        date_entry.bind("<FocusOut>", lambda event: validate_date_on_focusout(self.date_var, "Erreur de date de soumission"))
 
         # Champ No Soumission
         tk.Label(gen_frame, text="No Soumission :").grid(row=3, column=0, padx=5, pady=5, sticky="w")
@@ -1496,29 +1501,30 @@ class SubmissionForm:
 
     def save_submission(self, final=True, revision=False, duplication=False):
         try:
+            # Valider et convertir la date
+            date_submission = check_date_on_save(self.date_var.get())
+            if date_submission is None:
+                return
+
             submission_number = self.submission_number_var.get()
 
-            if duplication and not hasattr(self, "_contact_selected"):  # <- nouveau flag temporaire
+            if duplication and not hasattr(self, "_contact_selected"):
                 def on_contact_selected(contact):
                     self.client_var.set(contact["client_name"])
                     self.contact_var.set(contact["nom"])
-                    self._contact_selected = True  # ← marquer que le contact a été choisi
+                    self._contact_selected = True
                     self.save_submission(final=final, revision=revision, duplication=True)
 
                 ContactSelector(self.window, self.db_manager, on_contact_selected)
                 return
 
-            # Si on revient ici, c'est qu'on a sélectionné un contact, donc on génère le numéro
             if duplication:
                 self.generate_submission_number()
                 submission_number = self.submission_number_var.get()
                 revision_number = 0
-
                 if hasattr(self, "_contact_selected"):
                     del self._contact_selected
-
             elif revision:
-                # Extrait le préfixe (ex: S25-402)
                 base_number = submission_number.split(" ")[0]
                 with self.db_manager.get_connection() as conn:
                     cursor = conn.cursor()
@@ -1527,14 +1533,10 @@ class SubmissionForm:
                     """, (f"{base_number}%",))
                     max_rev = cursor.fetchone()[0]
                     revision_number = (max_rev or 0) + 1
-
-                # Formate avec REV.n
-                submission_number = f"{base_number} REV.{revision_number}"
-
+                    submission_number = f"{base_number} REV.{revision_number}"
             else:
                 revision_number = 0
 
-            # Met à jour visuellement le champ
             self.submission_number_var.set(submission_number)
 
             etat = "finalisé" if final else "brouillon"
@@ -1548,7 +1550,7 @@ class SubmissionForm:
                 "etat": etat,
                 "year": current_year,
                 "sequence": sequence,
-                "date_submission": self.date_var.get(),
+                "date_submission": date_submission,  # Utiliser la date validée
                 "client_name": self.client_var.get(),
                 "contact": self.contact_var.get(),
                 "projet": self.projet_var.get("1.0", tk.END).strip(),
@@ -1606,15 +1608,12 @@ class SubmissionForm:
                 "transport_sector": self.transport_sector_var.get()
             }
 
-            # Vérifier si la soumission existe déjà
             existing_submission = self.db_manager.get_submission_by_number(submission_number)
 
             if existing_submission and final and not revision and not duplication:
-                # Mettre à jour l'existant
                 self.db_manager.update_submission(submission_number, data)
                 messagebox.showinfo("Succès", f"Soumission mise à jour : {submission_number}")
             else:
-                # Insérer une nouvelle soumission
                 self.db_manager.insert_submission(data)
                 messagebox.showinfo("Succès", f"Soumission enregistrée : {submission_number}")
 
@@ -1622,9 +1621,7 @@ class SubmissionForm:
 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l’enregistrement : {e}")
-
-
-    
+        
 
     def open_project_notes(self):
         # Ouvre la fenêtre des notes et passe les données actuelles
@@ -1683,7 +1680,7 @@ class SubmissionForm:
 
             data = {
                 "submission_number": self.submission_number_var.get(),
-                "date_submission": self.date_var.get(),
+                "date_submission": self.check_date_on_save(self.date_var.get()),
                 "client_name": self.client_var.get(),
                 "contact": self.contact_var.get(),
                 "projet": self.projet_var.get("1.0", "end").strip(),
@@ -1701,4 +1698,6 @@ class SubmissionForm:
 
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur lors de l’ouverture de la fenêtre d’export : {e}")
+
+
 
