@@ -14,7 +14,7 @@ class WorkSheetsSearchWindow:
         self.db_manager = db_manager
         self.window = ttkb.Toplevel(parent)
         self.window.title("Recherche des feuilles de travail")
-        self.window.geometry("1100x900")
+        self.window.geometry("1000x900")
 
         self.create_widgets()
         self.load_recent_work_sheets()
@@ -29,7 +29,6 @@ class WorkSheetsSearchWindow:
             'client_reel': ttkb.StringVar(),
             'adresse_reel': ttkb.StringVar(),
             'date_travaux': ttkb.StringVar(),
-            'date_soumission': ttkb.StringVar(),
         }
 
         row = 0
@@ -38,7 +37,6 @@ class WorkSheetsSearchWindow:
             ("Client:", 'client_reel'),
             ("Adresse:", 'adresse_reel'),
             ("Date travaux (AAAA-MM-JJ):", 'date_travaux'),
-            ("Date soumission (AAAA-MM-JJ):", 'date_soumission'),
         ]:
             ttkb.Label(search_frame, text=label).grid(row=row, column=0, sticky="e", padx=5, pady=3)
             ttkb.Entry(search_frame, textvariable=self.vars[key], width=30).grid(row=row, column=1, sticky="w", padx=5)
@@ -48,15 +46,15 @@ class WorkSheetsSearchWindow:
 
         self.tree = ttkb.Treeview(
             self.window,
-            columns=("soumission_reel", "client_reel", "adresse_reel", "date_travaux", "date_soumission"),
+            columns=("soumission_reel", "client_reel", "adresse_reel", "date_travaux", "est_calcule"),
             show="headings",
             bootstyle="dark"
         )
 
         for col, label in zip(self.tree["columns"], [
-            "Soumission", "Client", "Adresse", "Date travaux", "Date soumission"]):
+            "Soumission", "Client", "Adresse", "Date travaux", "Coûts Calculés"]):
             self.tree.heading(col, text=label, anchor="w")
-            self.tree.column(col, width=150)
+            self.tree.column(col, width=150 if col != "est_calcule" else 100)
 
         self.tree.pack(fill="both", expand=True, padx=10, pady=10)
         self.tree.bind("<Double-1>", self.ouvrir_feuille)
@@ -70,7 +68,10 @@ class WorkSheetsSearchWindow:
             
             self.tree.delete(*self.tree.get_children())
             for row in resultats:
-                self.tree.insert("", "end", values=row)
+                # Convertir est_calcule en crochet (✔) si 1, gérer NULL ou autres types
+                est_calcule = row[4]
+                est_calcule_display = "✔" if est_calcule and int(est_calcule) == 1 else ""
+                self.tree.insert("", "end", values=(row[0], row[1], row[2], row[3], est_calcule_display))
         except Exception as e:
             Messagebox.show_error(f"Erreur lors du chargement des feuilles : {e}")
 
@@ -82,7 +83,10 @@ class WorkSheetsSearchWindow:
             
             self.tree.delete(*self.tree.get_children())
             for row in resultats:
-                self.tree.insert("", "end", values=row)
+                # Convertir est_calcule en crochet (✔) si 1, gérer NULL ou autres types
+                est_calcule = row[4]
+                est_calcule_display = "✔" if est_calcule and int(est_calcule) == 1 else ""
+                self.tree.insert("", "end", values=(row[0], row[1], row[2], row[3], est_calcule_display))
         except Exception as e:
             Messagebox.show_error(f"Erreur lors de la recherche : {e}")
 
@@ -120,7 +124,7 @@ class WorkSheetsSearchWindow:
             data = self.db_manager.charger_feuille(soumission_reel)
             
             if data:
-                WorkSheetDetailsWindow(self.window, data, self.db_manager)  # Passer db_manager
+                WorkSheetDetailsWindow(self.window, data, self.db_manager)
             else:
                 Messagebox.show_error(f"Feuille introuvable")
         except Exception as e:
@@ -129,7 +133,7 @@ class WorkSheetsSearchWindow:
 class WorkSheetDetailsWindow:
     def __init__(self, parent, data, db_manager):
         self.data = data
-        self.db_manager = db_manager  # Ajouter db_manager
+        self.db_manager = db_manager
         self.window = ttkb.Toplevel(parent)
         self.window.title(f"Détails de la feuille - {data['soumission_reel']}")
         self.window.geometry("1200x900")
@@ -145,9 +149,11 @@ class WorkSheetDetailsWindow:
         )
 
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            if self.window.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self.window.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
@@ -185,7 +191,12 @@ class WorkSheetDetailsWindow:
         ).pack(pady=10)
 
         # Bouton de fermeture
-        ttkb.Button(self.scrollable_frame, text="Fermer", command=self.window.destroy, bootstyle=DANGER).pack(pady=20)
+        ttkb.Button(self.scrollable_frame, text="Fermer", command=self._on_closing, bootstyle=DANGER).pack(pady=20)
+
+    def _on_closing(self):
+        """Nettoie la liaison de l'événement MouseWheel avant de fermer la fenêtre."""
+        self.window.unbind_all("<MouseWheel>")
+        self.window.destroy()
 
     def generate_form_html(self):
         """Génère un HTML simplifié basé sur les données pour afficher les champs."""

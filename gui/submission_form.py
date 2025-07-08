@@ -881,7 +881,14 @@ class SubmissionForm:
 
     def charger_donnees_submission(self, data):
         self.submission_number_var.set(data.get("submission_number", ""))
-        self.date_var.set(data.get("date_submission", ""))
+        date_submission = data.get("date_submission", "")
+        if date_submission:
+            try:
+                date_obj = datetime.strptime(date_submission, "%Y-%m-%d")
+                date_submission = date_obj.strftime("%d-%m-%Y")
+            except ValueError:
+                date_submission = ""
+        self.date_var.set(date_submission)
         self.client_var.set(data.get("client_name", ""))
         self.contact_var.set(data.get("contact", ""))
         self.projet_var.delete("1.0", tk.END)
@@ -1680,7 +1687,7 @@ class SubmissionForm:
 
             data = {
                 "submission_number": self.submission_number_var.get(),
-                "date_submission": self.check_date_on_save(self.date_var.get()),
+                "date_submission": check_date_on_save(self.date_var.get()),
                 "client_name": self.client_var.get(),
                 "contact": self.contact_var.get(),
                 "projet": self.projet_var.get("1.0", "end").strip(),

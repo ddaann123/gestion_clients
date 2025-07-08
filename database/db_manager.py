@@ -5,6 +5,11 @@ import os
 import ast
 from datetime import datetime
 import logging
+import tkinter as tk
+import ttkbootstrap as ttkb
+from ttkbootstrap.constants import *
+
+from .models import init_database  # Déplacé en haut du fichier
 
 class DatabaseManager:
     def __init__(self, db_path=None):
@@ -15,11 +20,10 @@ class DatabaseManager:
             base_dir = os.path.dirname(os.path.abspath(db_path))
         self.db_path = os.path.abspath(db_path)
         self.txt_path = os.path.abspath(os.path.join(base_dir, "../donnees_chantier.txt"))
-        from .models import init_database
         init_database(self.db_path)
         self.sync_txt_to_db()
-        print(f"[DEBUG] Base de données utilisée : {self.db_path}")
-        print(f"[DEBUG] Fichier texte utilisé : {self.txt_path}")
+        logging.debug(f"Base de données utilisée : {self.db_path}")
+        logging.debug(f"Fichier texte utilisé : {self.txt_path}")
 
     @contextmanager
     def get_connection(self):
@@ -36,13 +40,70 @@ class DatabaseManager:
     def close(self):
         pass
 
+
+
+    def create_tables(self):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Supprimer l'ancienne table pour garantir une définition correcte
+                cursor.execute("DROP TABLE IF EXISTS chantiers_reels")
+                cursor.execute("""
+                    CREATE TABLE chantiers_reels (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        soumission_reel TEXT,
+                        client_reel TEXT,
+                        adresse_reel TEXT,
+                        date_travaux TEXT,
+                        superficie_reel TEXT,
+                        produit_reel TEXT,
+                        sable_total_reel TEXT,
+                        sable_transporter_reel TEXT,
+                        sable_commande_reel TEXT,
+                        sacs_utilises_reel TEXT,
+                        sable_utilise_reel TEXT,
+                        membrane_posee_reel TEXT,
+                        nb_rouleaux_installes_reel TEXT,
+                        produit_diff TEXT,
+                        marches_reel TEXT,
+                        notes_reel TEXT,
+                        type_membrane TEXT,
+                        nb_sacs_prevus TEXT,
+                        thickness TEXT,
+                        notes_bureau TEXT,
+                        donnees_json TEXT,
+                        est_calcule INTEGER DEFAULT 0,
+                        UNIQUE(soumission_reel, date_travaux)
+                    )
+                """)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS costs (
+                        submission_number TEXT,
+                        date_travaux TEXT,
+                        client TEXT,
+                        adresse TEXT,
+                        surface REAL,
+                        facture_no TEXT,
+                        montant_facture_av_tx REAL,
+                        total_reel REAL,
+                        profit REAL,
+                        ratio_reel REAL,
+                        PRIMARY KEY (submission_number, date_travaux)
+                    )
+                """)
+                conn.commit()
+                logging.info("Tables créées ou vérifiées avec succès.")
+        except Exception as e:
+            logging.error(f"Erreur lors de la création des tables : {e}")
+            raise
+
     def read_txt_file(self):
         """
         Lit donnees_chantier.txt, gérant à la fois le format JSON et le format ligne par ligne.
         Retourne une liste de dictionnaires avec les clés normalisées.
         """
         if not os.path.exists(self.txt_path):
-            print(f"[DEBUG] Fichier {self.txt_path} non trouvé")
+            logging.debug(f"Fichier {self.txt_path} non trouvé")
             return []
 
         data = []
@@ -64,14 +125,14 @@ class DatabaseManager:
             with open(self.txt_path, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
                 if not content:
-                    print(f"[DEBUG] Fichier {self.txt_path} vide")
+                    logging.debug(f"Fichier {self.txt_path} vide")
                     return []
 
                 # Essayer de parser comme JSON
                 try:
                     data = json.loads(content)
                     if not isinstance(data, list):
-                        print(f"[DEBUG] Fichier {self.txt_path} n'est pas une liste JSON")
+                        logging.debug(f"Fichier {self.txt_path} n'est pas une liste JSON")
                         data = []
                     else:
                         # Normaliser les clés pour les entrées JSON
@@ -85,10 +146,10 @@ class DatabaseManager:
                             if "donnees_json" not in normalized_entry:
                                 normalized_entry["donnees_json"] = json.dumps({"heures_chantier": normalized_entry.get("heures_chantier", {})})
                             data[data.index(entry)] = normalized_entry
-                        print(f"[DEBUG] {len(data)} entrées lues depuis {self.txt_path} (format JSON)")
+                        logging.debug(f"{len(data)} entrées lues depuis {self.txt_path} (format JSON)")
                         return data
                 except json.JSONDecodeError:
-                    print(f"[DEBUG] Fichier {self.txt_path} n'est pas un JSON valide, tentative de lecture ligne par ligne")
+                    logging.debug(f"Fichier {self.txt_path} n'est pas un JSON valide, tentative de lecture ligne par ligne")
 
                 # Réinitialiser le curseur et lire ligne par ligne
                 f.seek(0)
@@ -99,7 +160,7 @@ class DatabaseManager:
                     try:
                         entry = ast.literal_eval(line)
                         if not isinstance(entry, dict):
-                            print(f"[DEBUG] Ligne ignorée (pas un dictionnaire) : {line[:50]}...")
+                            logging.debug(f"Ligne ignorée (pas un dictionnaire) : {line[:50]}...")
                             continue
                         normalized_entry = {}
                         for old_key, new_key in key_mapping.items():
@@ -111,155 +172,98 @@ class DatabaseManager:
                             normalized_entry["donnees_json"] = json.dumps({"heures_chantier": normalized_entry.get("heures_chantier", {})})
                         data.append(normalized_entry)
                     except (SyntaxError, ValueError) as e:
-                        print(f"[DEBUG] Erreur de parsing de la ligne : {line[:50]}... ({e})")
+                        logging.debug(f"Erreur de parsing de la ligne : {line[:50]}... ({e})")
                         continue
 
                 # Réécrire le fichier en JSON valide si des données ont été lues
                 if data:
                     with open(self.txt_path, 'w', encoding='utf-8') as f:
                         json.dump(data, f, indent=2, ensure_ascii=False)
-                    print(f"[DEBUG] Fichier {self.txt_path} converti en JSON valide")
+                    logging.debug(f"Fichier {self.txt_path} converti en JSON valide")
                 else:
-                    print(f"[DEBUG] Aucune donnée valide trouvée dans {self.txt_path}")
+                    logging.debug(f"Aucune donnée valide trouvée dans {self.txt_path}")
 
-                print(f"[DEBUG] {len(data)} entrées lues depuis {self.txt_path} (format ligne par ligne)")
+                logging.debug(f"{len(data)} entrées lues depuis {self.txt_path} (format ligne par ligne)")
                 return data
         except Exception as e:
-            print(f"[DEBUG] Erreur lors de la lecture de {self.txt_path} : {e}")
+            logging.error(f"Erreur lors de la lecture de {self.txt_path} : {e}")
             return []
 
     def sync_txt_to_db(self):
         """
         Synchronise les données de donnees_chantier.txt avec la table chantiers_reels.
-        Supprime les duplicatas en gardant la dernière entrée par soumission_reel.
+        Préserve les valeurs existantes de est_calcule et vide le fichier txt après synchronisation.
         """
         try:
             data = self.read_txt_file()
             if not data:
-                print(f"[DEBUG] Aucun donnée valide dans {self.txt_path}")
+                logging.debug(f"Aucune donnée valide dans {self.txt_path}")
                 return
 
             unique_data = {}
             for entry in data:
                 soumission_reel = entry.get("soumission_reel")
-                if soumission_reel:
-                    date_travaux = entry.get("date_travaux", "01-01-1900")
+                date_travaux = entry.get("date_travaux", "1900-01-01")
+                if soumission_reel and date_travaux:
+                    key = (soumission_reel, date_travaux)
                     try:
-                        date_travaux_dt = datetime.strptime(date_travaux, "%d-%m-%Y")
+                        date_travaux_dt = datetime.strptime(date_travaux, "%Y-%m-%d")
                     except ValueError:
                         date_travaux_dt = datetime(1900, 1, 1)
-                    if soumission_reel not in unique_data or \
-                       date_travaux_dt > datetime.strptime(unique_data[soumission_reel].get("date_travaux", "01-01-1900"), "%d-%m-%Y"):
-                        unique_data[soumission_reel] = entry
+                    if key not in unique_data or \
+                       date_travaux_dt > datetime.strptime(unique_data[key].get("date_travaux", "1900-01-01"), "%Y-%m-%d"):
+                        unique_data[key] = entry
+                    else:
+                        logging.debug(f"Doublon ignoré dans donnees_chantier.txt pour soumission_reel={soumission_reel}, date_travaux={date_travaux}")
 
-            # Réécrire donnees_chantier.txt sans duplicatas
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Récupérer les valeurs actuelles de est_calcule
+                cursor.execute("SELECT soumission_reel, date_travaux, est_calcule FROM chantiers_reels")
+                est_calcule_map = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
+
+                # Insérer ou mettre à jour les données
+                for key, entry in unique_data.items():
+                    soumission_reel, date_travaux = key
+                    # Utiliser la valeur existante de est_calcule ou 0 si nouvelle entrée
+                    est_calcule = est_calcule_map.get(key, 0)
+                    entry["est_calcule"] = est_calcule
+                    self.insert_work_sheet(entry, update_txt=False)
+
+                # Supprimer les enregistrements de la base qui ne sont plus dans unique_data
+                cursor.execute("SELECT soumission_reel, date_travaux FROM chantiers_reels")
+                existing_keys = {(row[0], row[1]) for row in cursor.fetchall()}
+                keys_to_delete = existing_keys - set(unique_data.keys())
+                for soumission_reel, date_travaux in keys_to_delete:
+                    cursor.execute(
+                        "DELETE FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
+                        (soumission_reel, date_travaux)
+                    )
+                    logging.debug(f"Supprimé soumission_reel={soumission_reel}, date_travaux={date_travaux} de chantiers_reels")
+
+                conn.commit()
+                logging.debug(f"Table chantiers_reels synchronisée avec {len(unique_data)} entrées, est_calcule préservé")
+
+            # Vider donnees_chantier.txt après synchronisation
             with open(self.txt_path, 'w', encoding='utf-8') as f:
-                json.dump(list(unique_data.values()), f, indent=2, ensure_ascii=False)
-            print(f"[DEBUG] Fichier {self.txt_path} mis à jour avec {len(unique_data)} entrées uniques")
-
-            # Vider la table chantiers_reels
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM chantiers_reels")
-                conn.commit()
-
-            # Insérer les données dans chantiers_reels
-            for entry in unique_data.values():
-                self.insert_work_sheet(entry)
-            print(f"[DEBUG] Table chantiers_reels synchronisée avec {len(unique_data)} entrées")
+                json.dump([], f)
+            logging.debug(f"Fichier {self.txt_path} vidé après synchronisation")
 
         except Exception as e:
-            print(f"[DEBUG] Erreur lors de la synchronisation de {self.txt_path} vers chantiers_reels : {e}")
+            logging.error(f"Erreur lors de la synchronisation de {self.txt_path} vers chantiers_reels : {e}")
+            raise
 
-    def delete_work_sheet(self, soumission_reel):
+    def insert_work_sheet(self, data, update_txt=True):
         """
-        Supprime une feuille de travail de chantiers_reels et de donnees_chantier.txt.
-        Retourne True si la suppression est réussie, False sinon.
-        """
-        try:
-            # Supprimer de la table chantiers_reels
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
-                conn.commit()
-                if cursor.rowcount > 0:
-                    print(f"[DEBUG] Feuille {soumission_reel} supprimée de chantiers_reels")
-                else:
-                    print(f"[DEBUG] Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}")
-
-            # Supprimer de donnees_chantier.txt
-            data = self.read_txt_file()
-            initial_count = len(data)
-            updated_data = [entry for entry in data if entry.get("soumission_reel") != soumission_reel]
-            if len(updated_data) < initial_count:
-                with open(self.txt_path, 'w', encoding='utf-8') as f:
-                    json.dump(updated_data, f, indent=2, ensure_ascii=False)
-                print(f"[DEBUG] Feuille {soumission_reel} supprimée de {self.txt_path}")
-                return True
-            else:
-                print(f"[DEBUG] Aucune feuille trouvée dans {self.txt_path} pour soumission_reel={soumission_reel}")
-                # Si aucune donnée n'a été lue à cause d'un format incorrect, forcer la réécriture du fichier
-                if not data:
-                    with open(self.txt_path, 'w', encoding='utf-8') as f:
-                        json.dump([], f, indent=2, ensure_ascii=False)
-                    print(f"[DEBUG] Fichier {self.txt_path} réinitialisé à vide en raison d'un format incorrect")
-                    return True
-                return False
-        except Exception as e:
-            print(f"[DEBUG] Erreur lors de la suppression de {soumission_reel} : {e}")
-            return False
-
-    def search_work_sheets(self, criteres=None, limit=None):
-        """
-        Recherche les feuilles de travail dans chantiers_reels selon les critères fournis.
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            query = """
-                SELECT soumission_reel, client_reel, adresse_reel, date_travaux, date_soumission
-                FROM chantiers_reels
-                WHERE 1=1
-            """
-            params = []
-            if criteres:
-                for key, value in criteres.items():
-                    query += f" AND {key} LIKE ?"
-                    params.append(f"%{value}%")
-            query += " ORDER BY date_travaux DESC"
-            if limit:
-                query += f" LIMIT ?"
-                params.append(limit)
-            cursor.execute(query, params)
-            results = cursor.fetchall()
-            print(f"[DEBUG] Résultats bruts de search_work_sheets : {results}")
-            return results
-
-    def charger_feuille(self, soumission_reel):
-        """
-        Charge les données d'une feuille de travail depuis chantiers_reels.
-        """
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
-            row = cursor.fetchone()
-            if not row:
-                print(f"[DEBUG] Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}")
-                return None
-            colonnes = [desc[0] for desc in cursor.description]
-            data = dict(zip(colonnes, row))
-            print(f"[DEBUG] Feuille chargée pour soumission_reel={soumission_reel} : {data}")
-            return data
-
-    def insert_work_sheet(self, data):
-        """
-        Insère une feuille de travail dans chantiers_reels et met à jour donnees_chantier.txt.
+        Insère une feuille de travail dans chantiers_reels et, optionnellement, met à jour donnees_chantier.txt.
+        Préserve la valeur existante de est_calcule.
         """
         columns = [
             "soumission_reel", "client_reel", "superficie_reel", "produit_reel", "produit_diff",
             "sable_total_reel", "sable_transporter_reel", "sable_commande_reel", "sacs_utilises_reel",
             "sable_utilise_reel", "membrane_posee_reel", "nb_rouleaux_installes_reel", "marches_reel",
             "notes_reel", "date_travaux", "date_soumission", "donnees_json", "adresse_reel",
-            "type_membrane", "nb_sacs_prevus", "thickness", "notes_bureau"
+            "type_membrane", "nb_sacs_prevus", "thickness", "notes_bureau", "est_calcule"
         ]
         default_values = {
             "soumission_reel": "",
@@ -283,31 +287,183 @@ class DatabaseManager:
             "type_membrane": "",
             "nb_sacs_prevus": "",
             "thickness": "",
-            "notes_bureau": ""
+            "notes_bureau": "",
+            "est_calcule": 0
         }
         try:
-            values = [data.get(col, default_values[col]) for col in columns]
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                # Vérifier si l'enregistrement existe déjà
+                soumission_reel = data.get("soumission_reel")
+                date_travaux = data.get("date_travaux")
+                cursor.execute(
+                    "SELECT est_calcule FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
+                    (soumission_reel, date_travaux)
+                )
+                result = cursor.fetchone()
+                if result:
+                    est_calcule = result[0]
+                    logging.debug(f"Enregistrement existant trouvé pour soumission_reel={soumission_reel}, date_travaux={date_travaux}, est_calcule={est_calcule}")
+                else:
+                    est_calcule = data.get("est_calcule", 0)
+                    logging.debug(f"Nouvel enregistrement pour soumission_reel={soumission_reel}, date_travaux={date_travaux}, est_calcule={est_calcule}")
+
+                values = [data.get(col, default_values[col]) for col in columns[:-1]] + [est_calcule]
                 query = f"""
                     INSERT OR REPLACE INTO chantiers_reels ({", ".join(columns)})
                     VALUES ({", ".join(["?" for _ in columns])})
                 """
                 cursor.execute(query, values)
                 conn.commit()
-                print(f"[DEBUG] Feuille insérée/mise à jour dans chantiers_reels : {data.get('soumission_reel')}")
+                logging.debug(f"Feuille insérée/mise à jour dans chantiers_reels : {soumission_reel}, date_travaux={date_travaux}")
 
-            # Mettre à jour donnees_chantier.txt
-            txt_data = self.read_txt_file()
-            txt_data = [entry for entry in txt_data if entry.get("soumission_reel") != data.get("soumission_reel")]
-            txt_data.append(data)
-            with open(self.txt_path, 'w', encoding='utf-8') as f:
-                json.dump(txt_data, f, indent=2, ensure_ascii=False)
-            print(f"[DEBUG] Feuille insérée/mise à jour dans {self.txt_path} : {data.get('soumission_reel')}")
+            if update_txt:
+                # Mettre à jour donnees_chantier.txt
+                txt_data = self.read_txt_file()
+                txt_data = [entry for entry in txt_data if not (entry.get("soumission_reel") == soumission_reel and entry.get("date_travaux") == date_travaux)]
+                data_to_write = {k: v for k, v in data.items() if k != "est_calcule"}
+                txt_data.append(data_to_write)
+                with open(self.txt_path, 'w', encoding='utf-8') as f:
+                    json.dump(txt_data, f, indent=2, ensure_ascii=False)
+                logging.debug(f"Feuille insérée/mise à jour dans {self.txt_path} : {soumission_reel}, date_travaux={date_travaux}")
 
         except Exception as e:
-            print(f"[DEBUG] Erreur lors de l'insertion de {data.get('soumission_reel')} : {e}")
+            logging.error(f"Erreur lors de l'insertion de {soumission_reel}, date_travaux={date_travaux} : {e}")
+            raise
 
+    def delete_work_sheet(self, soumission_reel, date_travaux=None):
+        """
+        Supprime une feuille de travail de chantiers_reels et de donnees_chantier.txt.
+        Retourne True si la suppression est réussie, False sinon.
+        """
+        try:
+            # Supprimer de la table chantiers_reels
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                if date_travaux:
+                    cursor.execute(
+                        "DELETE FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
+                        (soumission_reel, date_travaux)
+                    )
+                else:
+                    cursor.execute("DELETE FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+                conn.commit()
+                if cursor.rowcount > 0:
+                    logging.debug(f"Feuille supprimée de chantiers_reels : soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+                else:
+                    logging.debug(f"Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+
+            # Supprimer de donnees_chantier.txt
+            data = self.read_txt_file()
+            initial_count = len(data)
+            if date_travaux:
+                updated_data = [entry for entry in data if not (entry.get("soumission_reel") == soumission_reel and entry.get("date_travaux") == date_travaux)]
+            else:
+                updated_data = [entry for entry in data if entry.get("soumission_reel") != soumission_reel]
+            if len(updated_data) < initial_count:
+                with open(self.txt_path, 'w', encoding='utf-8') as f:
+                    json.dump(updated_data, f, indent=2, ensure_ascii=False)
+                logging.debug(f"Feuille supprimée de {self.txt_path} : soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+                return True
+            else:
+                logging.debug(f"Aucune feuille trouvée dans {self.txt_path} pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+                if not data:
+                    with open(self.txt_path, 'w', encoding='utf-8') as f:
+                        json.dump([], f, indent=2, ensure_ascii=False)
+                    logging.debug(f"Fichier {self.txt_path} réinitialisé à vide en raison d'un format incorrect")
+                    return True
+                return False
+        except Exception as e:
+            logging.error(f"Erreur lors de la suppression de soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'} : {e}")
+            return False
+
+    def search_work_sheets(self, criteres=None, limit=None):
+        """
+        Recherche les feuilles de travail dans chantiers_reels selon les critères fournis.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT soumission_reel, client_reel, adresse_reel, date_travaux, est_calcule
+                    FROM chantiers_reels
+                    WHERE 1=1
+                """
+                params = []
+                if criteres:
+                    for key, value in criteres.items():
+                        if key in ['soumission_reel', 'client_reel', 'adresse_reel', 'date_travaux']:
+                            query += f" AND {key} LIKE ?"
+                            params.append(f"%{value}%")
+                query += " ORDER BY date_travaux DESC"
+                if limit:
+                    query += f" LIMIT ?"
+                    params.append(limit)
+                cursor.execute(query, params)
+                results = cursor.fetchall()
+                logging.debug(f"Résultats bruts de search_work_sheets : {results}")
+                return results
+        except Exception as e:
+            logging.error(f"Erreur lors de la recherche des feuilles de travail : {e}")
+            raise
+
+    def charger_feuille(self, soumission_reel, date_travaux=None):
+        """
+        Charge les données d'une feuille de travail depuis chantiers_reels.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                if date_travaux:
+                    cursor.execute(
+                        "SELECT * FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
+                        (soumission_reel, date_travaux)
+                    )
+                else:
+                    cursor.execute("SELECT * FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+                row = cursor.fetchone()
+                if not row:
+                    logging.debug(f"Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+                    return None
+                colonnes = [desc[0] for desc in cursor.description]
+                data = dict(zip(colonnes, row))
+                logging.debug(f"Feuille chargée pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'} : {data}")
+                return data
+        except Exception as e:
+            logging.error(f"Erreur lors du chargement de la feuille soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'} : {e}")
+            raise
+
+    def check_cost_exists(self, submission_number, date_travaux):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT COUNT(*) FROM costs WHERE submission_number = ? AND date_travaux = ?",
+                    (submission_number, date_travaux)
+                )
+                return cursor.fetchone()[0] > 0
+        except Exception as e:
+            logging.error(f"Erreur lors de la vérification des coûts existants : {e}")
+            raise
+
+    def save_costs(self, submission_number, date_travaux, client, adresse, surface, facture_no, montant_facture_av_tx, total_reel, profit, ratio_reel):
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO costs (
+                        submission_number, date_travaux, client, adresse, surface,
+                        facture_no, montant_facture_av_tx, total_reel, profit, ratio_reel
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    submission_number, date_travaux, client, adresse, surface,
+                    facture_no, montant_facture_av_tx, total_reel, profit, ratio_reel
+                ))
+                conn.commit()
+                logging.info(f"Coûts sauvegardés pour submission_number={submission_number}, date_travaux={date_travaux}")
+        except Exception as e:
+            logging.error(f"Erreur lors de la sauvegarde des coûts : {e}")
+            raise
 
 
     
@@ -1001,7 +1157,7 @@ class DatabaseManager:
             logging.error(f"Erreur lors de la vérification de l'existence du coût : {e}")
             return False
 
-    def save_costs(self, submission_number, date_travaux, client, adresse, surface, facture_no, montant_facture_av_tx, total_reel, profit):
+    def save_costs(self, submission_number, date_travaux, client, adresse, surface, facture_no, montant_facture_av_tx, total_reel, profit, ratio_reel):
         """Sauvegarde les données dans la table costs."""
         try:
             with self.get_connection() as conn:
@@ -1009,11 +1165,11 @@ class DatabaseManager:
                 cursor.execute("""
                     INSERT INTO costs (
                         submission_number, date_travaux, client, adresse, surface,
-                        facture_no, montant_facture_av_tx, total_reel, profit
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        facture_no, montant_facture_av_tx, total_reel, profit, ratio_reel
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     submission_number, date_travaux, client, adresse, surface,
-                    facture_no, montant_facture_av_tx, total_reel, profit
+                    facture_no, montant_facture_av_tx, total_reel, profit, ratio_reel
                 ))
                 conn.commit()
                 logging.info(f"Données sauvegardées pour submission_number={submission_number}, date_travaux={date_travaux}")

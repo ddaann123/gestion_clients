@@ -9,11 +9,13 @@ def init_database(db_path):
         # Table chantiers_reels
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chantiers_reels (
-                soumission_reel TEXT PRIMARY KEY,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                soumission_reel TEXT,
                 client_reel TEXT,
+                adresse_reel TEXT,
+                date_travaux TEXT,
                 superficie_reel TEXT,
                 produit_reel TEXT,
-                produit_diff TEXT,
                 sable_total_reel TEXT,
                 sable_transporter_reel TEXT,
                 sable_commande_reel TEXT,
@@ -21,16 +23,16 @@ def init_database(db_path):
                 sable_utilise_reel TEXT,
                 membrane_posee_reel TEXT,
                 nb_rouleaux_installes_reel TEXT,
+                produit_diff TEXT,
                 marches_reel TEXT,
                 notes_reel TEXT,
-                date_travaux TEXT,
-                date_soumission TEXT,
-                donnees_json TEXT,
-                adresse_reel TEXT,
                 type_membrane TEXT,
                 nb_sacs_prevus TEXT,
                 thickness TEXT,
-                notes_bureau TEXT
+                notes_bureau TEXT,
+                donnees_json TEXT,
+                est_calcule INTEGER DEFAULT 0,
+                UNIQUE(soumission_reel, date_travaux)
             )
         """)
 
@@ -60,7 +62,6 @@ def init_database(db_path):
         # Table costs avec clé primaire auto-incrémentée et contrainte UNIQUE
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS costs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 submission_number TEXT,
                 date_travaux TEXT,
                 client TEXT,
@@ -70,7 +71,8 @@ def init_database(db_path):
                 montant_facture_av_tx REAL,
                 total_reel REAL,
                 profit REAL,
-                UNIQUE(submission_number, date_travaux)
+                ratio_reel REAL,
+                PRIMARY KEY (submission_number, date_travaux)
             )
         """)
         

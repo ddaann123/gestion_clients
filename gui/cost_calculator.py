@@ -5,6 +5,8 @@ import re
 import json
 from datetime import datetime
 import logging
+import sqlite3
+from ttkbootstrap.constants import *
 
 # Configurer le logging
 logging.basicConfig(level=logging.DEBUG)
@@ -28,9 +30,11 @@ class CostCalculatorWindow:
         )
 
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            if self.window.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self.window.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
@@ -317,6 +321,7 @@ class CostCalculatorWindow:
             "Facture no.",
             "Montant facturé av.tx",
             "Profit",
+            "Ratio de mélange réel"
             ""  # Espace
         ]
 
@@ -327,7 +332,7 @@ class CostCalculatorWindow:
                 entry = tk.Entry(section3_frame, textvariable=var, width=40)
                 entry.grid(row=row, column=1, sticky="w", padx=5, pady=5)
                 self.widgets[label] = var
-                if label == "Profit":
+                if label == "Profit" or label == "Ratio de mélange réel":
                     entry.configure(state="readonly")
                 elif label == "Montant facturé av.tx":
                     entry.bind("<KeyRelease>", lambda event: self.update_all_calculations())
@@ -359,6 +364,26 @@ class CostCalculatorWindow:
             command=self.window.destroy,
             bootstyle="danger"
         ).pack(side="left", padx=10)
+
+
+    def calculate_ratio_reel(self):
+        """Calcule le ratio réel : (((Qté sable commandée - Surplus de sable) * 2205) / 110) / Quantité de sacs."""
+        try:
+            qte_sable = self.widgets["Qté sable commandée_Réel"].get()
+            surplus_sable = self.widgets["Surplus de sable_Réel"].get()
+            qte_sacs = self.widgets["Quantité de sacs_Réel"].get()
+            
+            qte_sable = float(qte_sable) if qte_sable else 0.0
+            surplus_sable = float(surplus_sable) if surplus_sable else 0.0
+            qte_sacs = float(qte_sacs) if qte_sacs else 1.0  # Éviter division par zéro
+            
+            ratio = (((qte_sable - surplus_sable) * 2205) / 110) / qte_sacs
+            return f"{ratio:.1f}"  # Arrondi au dixième
+        except Exception as e:
+            logging.error(f"Erreur dans calculate_ratio_reel: {e}")
+            return "Erreur"
+
+
 
     def clean_monetary_string(self, value):
         """Nettoie une chaîne monétaire (ex. '2520.00 $') et la convertit en float."""
@@ -546,6 +571,10 @@ class CostCalculatorWindow:
         submission_type_machinerie = submission_details.get("type_machinerie", "Materiel roulant job std")
         self.widgets["Main d'œuvre_Réel"].set(f"{self.calculate_main_doeuvre_reel(submission_type_main):.2f}")
         self.widgets["Machinerie_Réel"].set(f"{self.calculate_machinerie_reel(submission_type_machinerie):.2f}")
+
+        # Mettre à jour le Ratio de mélange réel
+        self.widgets["Ratio de mélange réel"].set(self.calculate_ratio_reel())
+
 
         # Mettre à jour les totaux et différences
         self.calculate_totals()
@@ -785,6 +814,11 @@ class CostCalculatorWindow:
         except Exception as e:
             logging.error(f"Erreur dans calculate_prix_par_sac pour {product_name}: {e}")
             return "Erreur"
+        
+    def _on_closing(self):
+        """Nettoie la liaison de l'événement MouseWheel avant de fermer la fenêtre."""
+        self.window.unbind_all("<MouseWheel>")
+        self.window.destroy()
 
     def save_to_table(self):
         """Sauvegarde les données dans la table costs avec vérification des doublons et mise à jour de est_calcule."""
@@ -799,6 +833,7 @@ class CostCalculatorWindow:
             montant_facture_av_tx = self.widgets["Montant facturé av.tx"].get()
             total_reel = self.widgets["Total_Réel"].get()
             profit = self.widgets["Profit"].get()
+            ratio_reel = self.widgets["Ratio de mélange réel"].get()
 
             # Convertir les valeurs numériques
             try:
@@ -806,9 +841,10 @@ class CostCalculatorWindow:
                 montant_facture_av_tx = float(montant_facture_av_tx) if montant_facture_av_tx and montant_facture_av_tx != "Erreur" else 0.0
                 total_reel = float(total_reel) if total_reel and total_reel != "Erreur" else 0.0
                 profit = float(profit) if profit and profit != "Erreur" else 0.0
+                ratio_reel = float(ratio_reel) if ratio_reel and ratio_reel != "Erreur" else 0.0
             except ValueError as e:
                 logging.error(f"Erreur lors de la conversion des valeurs numériques : {e}")
-                tk.messagebox.showerror("Erreur", "Veuillez vérifier les valeurs numériques (Surface, Montant facturé, Total, Profit).")
+                tk.messagebox.showerror("Erreur", "Veuillez vérifier les valeurs numériques (Surface, Montant facturé, Total, Profit, Ratio de mélange réel).")
                 return
 
             # Valider les champs obligatoires
@@ -848,18 +884,19 @@ class CostCalculatorWindow:
                 facture_no=facture_no,
                 montant_facture_av_tx=montant_facture_av_tx,
                 total_reel=total_reel,
-                profit=profit
+                profit=profit,
+                ratio_reel=ratio_reel
             )
 
             # Mettre à jour est_calcule dans chantiers_reels
             with self.db_manager.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "UPDATE chantiers_reels SET est_calcule = 1 WHERE submission_number = ?",
+                    "UPDATE chantiers_reels SET est_calcule = 1 WHERE soumission_reel = ?",
                     (submission_number,)
                 )
                 conn.commit()
-                logging.info(f"chantiers_reels mis à jour: est_calcule=1 pour submission_number={submission_number}")
+                logging.info(f"chantiers_reels mis à jour: est_calcule=1 pour soumission_reel={submission_number}")
 
             tk.messagebox.showinfo("Succès", f"Données sauvegardées pour la soumission {submission_number}, date {date_travaux}.")
             self.window.destroy()

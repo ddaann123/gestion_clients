@@ -1,50 +1,20 @@
 from flask import Flask, render_template, request, jsonify
 import os
 import json
-import sqlite3
-from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from datetime import datetime
+import logging
+
+# Configurer le logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__, static_folder="static")
 
 # Chemins absolus
 TXT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "donnees_chantier.txt"))
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "database", "clients.db"))
-
-def init_chantiers_reels(db_path):
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS chantiers_reels (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                soumission_reel TEXT,
-                client_reel TEXT,
-                superficie_reel TEXT,
-                produit_reel TEXT,
-                produit_diff TEXT,
-                sable_total_reel TEXT,
-                sable_transporter_reel TEXT,
-                sable_commande_reel TEXT,
-                sacs_utilises_reel TEXT,
-                sable_utilise_reel TEXT,
-                membrane_posee_reel TEXT,
-                nb_rouleaux_installes_reel TEXT,
-                marches_reel TEXT,
-                notes_reel TEXT,
-                date_travaux TEXT,
-                date_soumission TEXT,
-                donnees_json TEXT,
-                adresse_reel TEXT,
-                type_membrane TEXT,
-                nb_sacs_prevus TEXT,
-                thickness TEXT,
-                notes_bureau TEXT
-            )
-        """)
-        conn.commit()
-        
 
 def get_employe_nom(i):
     employes = {
@@ -64,9 +34,8 @@ EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "dlegare@planchersbetonleger.com")
 
 def send_email(data):
-    
     if not EMAIL_ADDRESS or not EMAIL_PASSWORD or not EMAIL_RECIPIENT:
-        print(f"[ERREUR] Configuration email invalide : EMAIL_ADDRESS={EMAIL_ADDRESS}, EMAIL_PASSWORD={'***' if EMAIL_PASSWORD else None}, EMAIL_RECIPIENT={EMAIL_RECIPIENT}")
+        logging.error(f"Configuration email invalide : EMAIL_ADDRESS={EMAIL_ADDRESS}, EMAIL_PASSWORD={'***' if EMAIL_PASSWORD else None}, EMAIL_RECIPIENT={EMAIL_RECIPIENT}")
         return
     msg = MIMEMultipart()
     msg['From'] = EMAIL_ADDRESS
@@ -129,12 +98,11 @@ def send_email(data):
     try:
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
-            
             server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             server.send_message(msg)
-        print(f"✅ Email envoyé à {EMAIL_RECIPIENT} pour soumission_reel {data['soumission_reel']}")
+        logging.info(f"Email envoyé à {EMAIL_RECIPIENT} pour soumission_reel {data['soumission_reel']}")
     except Exception as e:
-        print(f"[ERREUR] Échec de l'envoi de l'email : {str(e)}")
+        logging.error(f"Échec de l'envoi de l'email : {str(e)}")
 
 def calculate_work_hours(start_time, end_time):
     if not start_time or not end_time:
@@ -153,9 +121,9 @@ def formulaire():
     try:
         with open("static/formulaires.json", "r", encoding="utf-8") as f:
             formulaires = json.load(f)
-        print(f"[INFO] {len(formulaires)} formulaires chargés depuis formulaires.json")
+        logging.info(f"{len(formulaires)} formulaires chargés depuis formulaires.json")
     except Exception as e:
-        print(f"[ERREUR] Impossible de lire formulaires.json : {e}")
+        logging.error(f"Impossible de lire formulaires.json : {e}")
         formulaires = []
     
     employes = {
@@ -169,13 +137,10 @@ def formulaire():
         8: "JONATHAN GRENIER"
     }
     
-    
     return render_template("formulaire.html", formulaires=formulaires, employes=employes)
 
 @app.route("/submit", methods=["POST"])
 def submit():
-    
-
     try:
         data = {
             "soumission_reel": request.form.get("soumission"),
@@ -202,18 +167,16 @@ def submit():
             "donnees_json": ""
         }
 
-        
-
         if not data["date_travaux"]:
             with open("static/formulaires.json", "r", encoding="utf-8") as f:
                 formulaires = json.load(f)
                 for f in formulaires:
                     if f["html"].find(data["soumission_reel"]) != -1:
                         data["date_travaux"] = f["date_travaux"]
-                        
                         break
                 else:
-                    print("[ERREUR] Aucune correspondance trouvée pour soumission_reel dans formulaires.json")
+                    logging.error(f"Aucune correspondance trouvée pour soumission_reel={data['soumission_reel']} dans formulaires.json")
+                    return jsonify({"success": False, "error": "Aucune correspondance trouvée pour soumission_reel"}), 400
 
         for i in range(1, 12):
             employe_nom = request.form.get(f"nom_custom_{i}") if i > 8 else get_employe_nom(i)
@@ -239,73 +202,24 @@ def submit():
                     try:
                         existing_data = json.load(f)
                         if not isinstance(existing_data, list):
-                            
                             existing_data = []
                     except json.JSONDecodeError:
-                        
                         existing_data = []
             
+            # Vérifier si une entrée existe pour soumission_reel et date_travaux
+            soumission_reel = data["soumission_reel"]
+            date_travaux = data["date_travaux"]
+            existing_data = [entry for entry in existing_data if not (entry.get("soumission_reel") == soumission_reel and entry.get("date_travaux") == date_travaux)]
             existing_data.append(data)
             
             with open(TXT_PATH, "w", encoding="utf-8") as f:
                 json.dump(existing_data, f, indent=2, ensure_ascii=False)
-            
+            logging.info(f"Feuille ajoutée à {TXT_PATH} : soumission_reel={soumission_reel}, date_travaux={date_travaux}")
         except Exception as e:
-            print(f"[ERREUR] Impossible d'écrire dans {TXT_PATH} : {e}")
+            logging.error(f"Impossible d'écrire dans {TXT_PATH} : {e}")
+            return jsonify({"success": False, "error": f"Impossible d'écrire dans donnees_chantier.txt : {str(e)}"}), 500
 
-        
         send_email(data)
-        
-
-        try:
-            with sqlite3.connect(DB_PATH) as conn:
-                cursor = conn.cursor()
-                init_chantiers_reels(DB_PATH)
-                
-                columns = [
-                    "soumission_reel", "client_reel", "superficie_reel", "produit_reel",
-                    "produit_diff", "sable_total_reel", "sable_transporter_reel",
-                    "sable_commande_reel", "sacs_utilises_reel", "sable_utilise_reel",
-                    "membrane_posee_reel", "nb_rouleaux_installes_reel", "marches_reel",
-                    "notes_reel", "date_travaux", "date_soumission", "donnees_json",
-                    "adresse_reel", "type_membrane", "nb_sacs_prevus",
-                    "thickness", "notes_bureau"
-                ]
-                values = [
-                    data.get("soumission_reel", ""),
-                    data.get("client_reel", ""),
-                    data.get("superficie_reel", ""),
-                    data.get("produit_reel", ""),
-                    data.get("produit_diff", ""),
-                    data.get("sable_total_reel", ""),
-                    data.get("sable_transporter_reel", ""),
-                    data.get("sable_commande_reel", ""),
-                    data.get("sacs_utilises_reel", ""),
-                    data.get("sable_utilise_reel", ""),
-                    data.get("membrane_posee_reel", ""),
-                    data.get("nb_rouleaux_installes_reel", ""),
-                    data.get("marches_reel", ""),
-                    data.get("notes_reel", ""),
-                    data.get("date_travaux", ""),
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    data.get("donnees_json", ""),
-                    data.get("adresse_reel", ""),
-                    data.get("type_membrane", ""),
-                    data.get("nb_sacs_prevus", ""),
-                    data.get("thickness", ""),
-                    data.get("notes_bureau", "")
-                ]
-                
-                query = f"""
-                    INSERT INTO chantiers_reels ({", ".join(columns)})
-                    VALUES ({", ".join(["?" for _ in columns])})
-                """
-                
-                cursor.execute(query, values)
-                conn.commit()
-                
-        except Exception as e:
-            print(f"[ERREUR] Impossible d'insérer dans la table chantiers_reels : {str(e)}")
 
         try:
             with open("static/formulaires.json", "r", encoding="utf-8") as f:
@@ -313,14 +227,14 @@ def submit():
             nouvelle_liste = [f for f in formulaires if f["date_travaux"] != data["date_travaux"]]
             with open("static/formulaires.json", "w", encoding="utf-8") as f:
                 json.dump(nouvelle_liste, f, indent=2, ensure_ascii=False)
-            print(f"✅ Feuille soumise retirée pour date_travaux : {data['date_travaux']}")
+            logging.info(f"Feuille soumise retirée pour date_travaux : {data['date_travaux']}")
         except Exception as e:
-            print(f"[ERREUR] Impossible de mettre à jour formulaires.json : {e}")
+            logging.error(f"Impossible de mettre à jour formulaires.json : {e}")
 
-        print(f"✅ Formulaire soumis pour date_travaux : {data['date_travaux']}")
+        logging.info(f"Formulaire soumis pour soumission_reel={soumission_reel}, date_travaux={date_travaux}")
         return jsonify({"success": True})
     except Exception as e:
-        print(f"[ERREUR] Échec de la soumission : {e}")
+        logging.error(f"Échec de la soumission : {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
