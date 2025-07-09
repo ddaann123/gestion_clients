@@ -9,7 +9,7 @@ import tkinter as tk
 import ttkbootstrap as ttkb
 from ttkbootstrap.constants import *
 
-from .models import init_database  # Déplacé en haut du fichier
+from database.models import init_database  # Déplacé en haut du fichier
 
 class DatabaseManager:
     def __init__(self, db_path=None):
@@ -27,7 +27,7 @@ class DatabaseManager:
 
     @contextmanager
     def get_connection(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
         try:
             yield conn
         finally:
@@ -331,51 +331,40 @@ class DatabaseManager:
             logging.error(f"Erreur lors de l'insertion de {soumission_reel}, date_travaux={date_travaux} : {e}")
             raise
 
-    def delete_work_sheet(self, soumission_reel, date_travaux=None):
+    def delete_work_sheet(self, soumission_reel, date_travaux):
         """
         Supprime une feuille de travail de chantiers_reels et de donnees_chantier.txt.
         Retourne True si la suppression est réussie, False sinon.
         """
         try:
-            # Supprimer de la table chantiers_reels
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                if date_travaux:
-                    cursor.execute(
-                        "DELETE FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
-                        (soumission_reel, date_travaux)
-                    )
-                else:
-                    cursor.execute("DELETE FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+                cursor.execute(
+                    "DELETE FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
+                    (soumission_reel, date_travaux)
+                )
                 conn.commit()
-                if cursor.rowcount > 0:
-                    logging.debug(f"Feuille supprimée de chantiers_reels : soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
-                else:
-                    logging.debug(f"Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+                logging.debug(f"Enregistrement supprimé de chantiers_reels : soumission_reel={soumission_reel}, date_travaux={date_travaux}")
 
             # Supprimer de donnees_chantier.txt
             data = self.read_txt_file()
             initial_count = len(data)
-            if date_travaux:
-                updated_data = [entry for entry in data if not (entry.get("soumission_reel") == soumission_reel and entry.get("date_travaux") == date_travaux)]
-            else:
-                updated_data = [entry for entry in data if entry.get("soumission_reel") != soumission_reel]
+            updated_data = [entry for entry in data if not (entry.get("soumission_reel") == soumission_reel and entry.get("date_travaux") == date_travaux)]
             if len(updated_data) < initial_count:
                 with open(self.txt_path, 'w', encoding='utf-8') as f:
                     json.dump(updated_data, f, indent=2, ensure_ascii=False)
-                logging.debug(f"Feuille supprimée de {self.txt_path} : soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+                logging.debug(f"Feuille supprimée de {self.txt_path} : soumission_reel={soumission_reel}, date_travaux={date_travaux}")
                 return True
             else:
-                logging.debug(f"Aucune feuille trouvée dans {self.txt_path} pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
-                if not data:
-                    with open(self.txt_path, 'w', encoding='utf-8') as f:
-                        json.dump([], f, indent=2, ensure_ascii=False)
-                    logging.debug(f"Fichier {self.txt_path} réinitialisé à vide en raison d'un format incorrect")
-                    return True
-                return False
+                logging.debug(f"Aucune feuille trouvée dans {self.txt_path} pour soumission_reel={soumission_reel}, date_travaux={date_travaux}")
+                return cursor.rowcount > 0
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e):
+                logging.error(f"Base de données verrouillée lors de la suppression de soumission_reel={soumission_reel}, date_travaux={date_travaux}")
+            raise
         except Exception as e:
-            logging.error(f"Erreur lors de la suppression de soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'} : {e}")
-            return False
+            logging.error(f"Erreur lors de la suppression de soumission_reel={soumission_reel}, date_travaux={date_travaux} : {str(e)}")
+            raise
 
     def search_work_sheets(self, criteres=None, limit=None):
         """
@@ -407,30 +396,27 @@ class DatabaseManager:
             logging.error(f"Erreur lors de la recherche des feuilles de travail : {e}")
             raise
 
-    def charger_feuille(self, soumission_reel, date_travaux=None):
+    def charger_feuille(self, soumission_reel, date_travaux):
         """
         Charge les données d'une feuille de travail depuis chantiers_reels.
         """
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                if date_travaux:
-                    cursor.execute(
-                        "SELECT * FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
-                        (soumission_reel, date_travaux)
-                    )
-                else:
-                    cursor.execute("SELECT * FROM chantiers_reels WHERE soumission_reel = ?", (soumission_reel,))
+                cursor.execute(
+                    "SELECT * FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
+                    (soumission_reel, date_travaux)
+                )
                 row = cursor.fetchone()
                 if not row:
-                    logging.debug(f"Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'}")
+                    logging.debug(f"Aucune feuille trouvée dans chantiers_reels pour soumission_reel={soumission_reel}, date_travaux={date_travaux}")
                     return None
                 colonnes = [desc[0] for desc in cursor.description]
                 data = dict(zip(colonnes, row))
-                logging.debug(f"Feuille chargée pour soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'} : {data}")
+                logging.debug(f"Feuille chargée pour soumission_reel={soumission_reel}, date_travaux={date_travaux} : {data}")
                 return data
         except Exception as e:
-            logging.error(f"Erreur lors du chargement de la feuille soumission_reel={soumission_reel}, date_travaux={date_travaux or 'toutes dates'} : {e}")
+            logging.error(f"Erreur lors du chargement de la feuille soumission_reel={soumission_reel}, date_travaux={date_travaux} : {str(e)}")
             raise
 
     def check_cost_exists(self, submission_number, date_travaux):

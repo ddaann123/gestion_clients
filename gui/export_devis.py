@@ -200,8 +200,8 @@ POUR LA POSE DE REVETEMENTS SOUPLES, VEUILLEZ VOUS RÉFÉRER AUX RECOMMANDATIONS
                 ws.range("B37").value = membrane
                 ws.range("E38").value = "1/8\""
                 ws.range("E39").value = "1/8\""
-                ws.range("B38").value = "   POSE SANS DIVISIONS"
-                ws.range("B39").value = "   POSE AVEC DIVISIONS"
+                ws.range("B38").value = "   FOURN.+POSE SANS DIVISIONS"
+                ws.range("B39").value = "   FOURN.+POSE AVEC DIVISIONS"
                 ws.range("I38").value = "PI²"
                 ws.range("I39").value = "PI²"
 

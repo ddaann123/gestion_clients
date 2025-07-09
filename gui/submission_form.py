@@ -295,13 +295,8 @@ class SubmissionForm:
         self.sealant_total_var.trace_add("write", self.update_sous_total_fournisseurs)
         self.prix_total_sacs_var.trace_add("write", self.update_sous_total_fournisseurs)
         self.prix_total_sable_var.trace_add("write", self.update_sous_total_fournisseurs)
+        self._initializing = True
         standard_width = 15 #LARGEUR UNIFORME POUR LES CHAMPS
-
-
-
-
-
-
    
 
 
@@ -312,7 +307,6 @@ class SubmissionForm:
 
         self.window = tk.Toplevel(parent)
         self.window.title("Nouvelle Soumission")
-
         self.window.geometry("1000x900")  # ← tu peux ajuster ici largeur x hauteur
 
 
@@ -320,21 +314,21 @@ class SubmissionForm:
         container = ttk.Frame(self.window)
         container.pack(fill="both", expand=True)
 
-        canvas = tk.Canvas(container)
-        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
+        self.canvas = tk.Canvas(container)
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=self.canvas.yview)
+        scrollable_frame = ttk.Frame(self.canvas)
 
         scrollable_frame.bind(
             "<Configure>",
-            lambda e: canvas.configure(
-                scrollregion=canvas.bbox("all")
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
             )
         )
 
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
 
-        canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
         # ---- Nouveau parent pour les widgets ----
@@ -344,9 +338,16 @@ class SubmissionForm:
         self.window.grab_set()
 
         def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            try:
+                self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            except tk.TclError:
+                pass  # Ignorer si le canvas est détruit    
 
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self.window.bind("<MouseWheel>", _on_mousewheel)
+
+
+
+        
 
 
 
@@ -465,7 +466,7 @@ class SubmissionForm:
         self.ratio_menu.config(width=standard_width)
         self.ratio_menu.grid(row=0, column=5, padx=5, pady=5, sticky="w")
         self.ratio_menu.config(state="disabled")
-        self.update_ratio_options()
+
 
 
         # Nouveau champ Type de membrane
@@ -819,13 +820,16 @@ class SubmissionForm:
         tk.Button(btn_frame, text="Générer le devis", command=self.generer_devis).grid(row=0, column=5, padx=5)
         tk.Button(btn_frame, text="Feuille de travail", command=lambda: ExportFeuilleTravailWindow(self.window, self.get_submission_data(), self.db_manager)).grid(row=0, column=6, padx=5)
 
-
-
+        
+        self._initializing = False
+        self.update_ratio_options()
 
 
 
         self.existing_submission = existing_submission
         self.init_chargement()
+
+
 
 
     def get_submission_data(self):
@@ -1661,6 +1665,8 @@ class SubmissionForm:
 
 
     def update_ratio_options(self, *args):
+        if hasattr(self, '_initializing') and self._initializing:
+            return  # Ignorer si encore en phase d'initialisation
         product_name = self.product_var.get()
         if product_name:
             product_details = next((d for d in self.db_manager.get_produit_details() if d[0] == product_name), None)

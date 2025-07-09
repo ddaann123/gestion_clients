@@ -5,9 +5,12 @@ import json
 import re
 from datetime import datetime
 import tkinter as tk
+import logging
 
 from gui.cost_calculator import CostCalculatorWindow
 
+# Configurer le logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class WorkSheetsSearchWindow:
     def __init__(self, parent, db_manager):
@@ -65,30 +68,45 @@ class WorkSheetsSearchWindow:
         """Charge les 25 dernières feuilles de travail."""
         try:
             resultats = self.db_manager.search_work_sheets(limit=25)
+            logging.debug(f"Résultats bruts dans load_recent_work_sheets : {resultats}")
             
             self.tree.delete(*self.tree.get_children())
+            seen = set()  # Pour éviter les doublons dans l'affichage
             for row in resultats:
-                # Convertir est_calcule en crochet (✔) si 1, gérer NULL ou autres types
-                est_calcule = row[4]
-                est_calcule_display = "✔" if est_calcule and int(est_calcule) == 1 else ""
-                self.tree.insert("", "end", values=(row[0], row[1], row[2], row[3], est_calcule_display))
+                key = (row[0], row[3])  # soumission_reel, date_travaux
+                if key not in seen:
+                    seen.add(key)
+                    est_calcule = row[4]
+                    est_calcule_display = "✔" if est_calcule and int(est_calcule) == 1 else ""
+                    self.tree.insert("", "end", values=(row[0], row[1], row[2], row[3], est_calcule_display))
+                    logging.debug(f"Affichage de la feuille : {row}")
+            logging.debug(f"Fin de load_recent_work_sheets, {len(seen)} feuilles affichées")
         except Exception as e:
-            Messagebox.show_error(f"Erreur lors du chargement des feuilles : {e}")
+            logging.error(f"Erreur lors du chargement des feuilles : {str(e)}")
+            Messagebox.show_error(f"Erreur lors du chargement des feuilles : {str(e)}")
 
     def rechercher(self):
         """Recherche les feuilles selon les critères saisis."""
-        criteres = {k: v.get().strip() for k, v in self.vars.items() if v.get().strip() != ""}
         try:
-            resultats = self.db_manager.search_work_sheets(criteres)
+            criteres = {k: v.get().strip() for k, v in self.vars.items() if v.get().strip() != ""}
+            logging.debug(f"Critères de recherche : {criteres}")
+            resultats = self.db_manager.search_work_sheets(**criteres)
+            logging.debug(f"Résultats bruts dans rechercher : {resultats}")
             
             self.tree.delete(*self.tree.get_children())
+            seen = set()  # Pour éviter les doublons dans l'affichage
             for row in resultats:
-                # Convertir est_calcule en crochet (✔) si 1, gérer NULL ou autres types
-                est_calcule = row[4]
-                est_calcule_display = "✔" if est_calcule and int(est_calcule) == 1 else ""
-                self.tree.insert("", "end", values=(row[0], row[1], row[2], row[3], est_calcule_display))
+                key = (row[0], row[3])  # soumission_reel, date_travaux
+                if key not in seen:
+                    seen.add(key)
+                    est_calcule = row[4]
+                    est_calcule_display = "✔" if est_calcule and int(est_calcule) == 1 else ""
+                    self.tree.insert("", "end", values=(row[0], row[1], row[2], row[3], est_calcule_display))
+                    logging.debug(f"Affichage de la feuille : {row}")
+            logging.debug(f"Fin de rechercher, {len(seen)} feuilles affichées")
         except Exception as e:
-            Messagebox.show_error(f"Erreur lors de la recherche : {e}")
+            logging.error(f"Erreur lors de la recherche : {str(e)}")
+            Messagebox.show_error(f"Erreur lors de la recherche : {str(e)}")
 
     def supprimer_feuille(self):
         """Supprime la feuille de travail sélectionnée."""
@@ -97,21 +115,24 @@ class WorkSheetsSearchWindow:
             Messagebox.show_warning("Veuillez sélectionner une feuille à supprimer.")
             return
 
-        soumission_reel = self.tree.item(item)["values"][0]
+        values = self.tree.item(item)["values"]
+        soumission_reel = values[0]
+        date_travaux = values[3]  # Date travaux est à l'index 3
         message = (
             f"⚠️ Cette action est irréversible.\n\n"
             f"Voulez-vous VRAIMENT supprimer définitivement la feuille de travail :\n\n"
-            f"{soumission_reel} ?"
+            f"{soumission_reel} ({date_travaux}) ?"
         )
 
         confirmation = Messagebox.yesno("Confirmation de suppression", message)
         if confirmation:
             try:
-                self.db_manager.delete_work_sheet(soumission_reel)
-                Messagebox.show_info(f"La feuille de travail {soumission_reel} a été supprimée.")
+                self.db_manager.delete_work_sheet(soumission_reel, date_travaux)
+                Messagebox.show_info(f"La feuille de travail {soumission_reel} ({date_travaux}) a été supprimée.")
                 self.load_recent_work_sheets()
             except Exception as e:
-                Messagebox.show_error(f"Erreur lors de la suppression : {e}")
+                logging.error(f"Erreur lors de la suppression de soumission_reel={soumission_reel}, date_travaux={date_travaux} : {str(e)}")
+                Messagebox.show_error(f"Erreur lors de la suppression : {str(e)}")
 
     def ouvrir_feuille(self, event):
         """Ouvre les détails de la feuille sélectionnée."""
@@ -119,23 +140,26 @@ class WorkSheetsSearchWindow:
         if not item:
             return
         soumission_reel = self.tree.item(item)['values'][0]
+        date_travaux = self.tree.item(item)['values'][3]
         
         try:
-            data = self.db_manager.charger_feuille(soumission_reel)
+            data = self.db_manager.charger_feuille(soumission_reel, date_travaux)
+            logging.debug(f"Chargement de la feuille : soumission_reel={soumission_reel}, date_travaux={date_travaux}, data={data}")
             
             if data:
                 WorkSheetDetailsWindow(self.window, data, self.db_manager)
             else:
-                Messagebox.show_error(f"Feuille introuvable")
+                Messagebox.show_error(f"Feuille introuvable pour {soumission_reel}, {date_travaux}")
         except Exception as e:
-            Messagebox.show_error(f"Erreur lors de l'ouverture : {e}")
+            logging.error(f"Erreur lors de l'ouverture de soumission_reel={soumission_reel}, date_travaux={date_travaux} : {str(e)}")
+            Messagebox.show_error(f"Erreur lors de l'ouverture : {str(e)}")
 
 class WorkSheetDetailsWindow:
     def __init__(self, parent, data, db_manager):
         self.data = data
         self.db_manager = db_manager
         self.window = ttkb.Toplevel(parent)
-        self.window.title(f"Détails de la feuille - {data['soumission_reel']}")
+        self.window.title(f"Détails de la feuille - {data['soumission_reel']} ({data['date_travaux']})")
         self.window.geometry("1200x900")
 
         # Canvas avec scrollbar
@@ -233,6 +257,12 @@ class WorkSheetDetailsWindow:
                 <div class="form-group">
                     <label>Client</label>
                     <input name="client" value="{donnees.get('client_reel', '')}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date des travaux</label>
+                    <input name="date_travaux" value="{donnees.get('date_travaux', '')}">
                 </div>
             </div>
             <label>Adresse</label>
@@ -339,6 +369,7 @@ class WorkSheetDetailsWindow:
             'soumission': 'soumission_reel',
             'client': 'client_reel',
             'adresse_reel': 'adresse_reel',
+            'date_travaux': 'date_travaux',
             'produit': 'produit_reel',
             'produit_diff': 'produit_diff',
             'superficie': 'superficie_reel',
