@@ -19,6 +19,14 @@ class WorkSheetsSearchWindow:
         self.window.title("Recherche des feuilles de travail")
         self.window.geometry("1000x900")
 
+        # Synchroniser les données de donnees_chantier.txt avec la table chantiers_reels
+        try:
+            self.db_manager.sync_txt_to_db()
+            logging.debug("Synchronisation de donnees_chantier.txt effectuée à l'ouverture de WorkSheetsSearchWindow")
+        except Exception as e:
+            logging.error(f"Erreur lors de la synchronisation à l'ouverture : {str(e)}")
+            Messagebox.show_error(f"Erreur lors de la synchronisation des données : {str(e)}")
+
         self.create_widgets()
         self.load_recent_work_sheets()
 

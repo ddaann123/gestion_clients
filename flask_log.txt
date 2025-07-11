@@ -1,0 +1,3 @@
+# le log flask_log.txt est dans C:\Users\danle\flask_log.txt
+
+# Consulter pour les détails de tache planifié dans Windows et pour les logs de connection

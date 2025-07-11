@@ -3,13 +3,13 @@ from contextlib import contextmanager
 import json
 import os
 import ast
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import tkinter as tk
 import ttkbootstrap as ttkb
 from ttkbootstrap.constants import *
 
-from database.models import init_database  # Déplacé en haut du fichier
+from database.models import init_database
 
 class DatabaseManager:
     def __init__(self, db_path=None):
@@ -21,6 +21,7 @@ class DatabaseManager:
         self.db_path = os.path.abspath(db_path)
         self.txt_path = os.path.abspath(os.path.join(base_dir, "../donnees_chantier.txt"))
         init_database(self.db_path)
+        self.create_inventory_table()
         self.sync_txt_to_db()
         logging.debug(f"Base de données utilisée : {self.db_path}")
         logging.debug(f"Fichier texte utilisé : {self.txt_path}")
@@ -40,7 +41,155 @@ class DatabaseManager:
     def close(self):
         pass
 
+    def create_inventory_table(self):
+        """Crée la table inventaire pour gérer les stocks et projets à venir."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS inventaire (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        produit_nom TEXT NOT NULL,
+                        categorie TEXT NOT NULL, -- 'Produit de béton' ou 'Membrane'
+                        quantite_commandee REAL NOT NULL, -- Quantité commandée (peut être négative)
+                        po_number TEXT,
+                        date_po TEXT, -- Date du P.O.
+                        date_arrivee TEXT, -- Date de livraison prévue ou date des travaux
+                        est_approximatif INTEGER DEFAULT 0, -- 0 pour réel, 1 pour approximatif
+                        UNIQUE(produit_nom, po_number, date_arrivee)
+                    )
+                """)
+                conn.commit()
+                logging.info("Table inventaire créée ou vérifiée avec succès.")
+        except Exception as e:
+            logging.error(f"Erreur lors de la création de la table inventaire : {e}")
+            raise
 
+    def add_inventory(self, produit_nom, categorie, quantite_commandee, po_number=None, date_po=None, date_arrivee=None, est_approximatif=0):
+        """Ajoute une entrée dans la table inventaire."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO inventaire (produit_nom, categorie, quantite_commandee, po_number, date_po, date_arrivee, est_approximatif)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (produit_nom, categorie, quantite_commandee, po_number, date_po, date_arrivee, est_approximatif))
+                conn.commit()
+                logging.info(f"Produit {produit_nom} ajouté à l'inventaire (catégorie: {categorie}, quantité: {quantite_commandee}, approximatif: {est_approximatif})")
+        except Exception as e:
+            logging.error(f"Erreur lors de l'ajout à l'inventaire : {e}")
+            raise
+
+    def update_inventory(self, id, produit_nom, categorie, quantite_commandee=None, po_number=None, date_po=None, date_arrivee=None, est_approximatif=None):
+        """Met à jour une entrée dans la table inventaire."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = "UPDATE inventaire SET "
+                params = []
+                if quantite_commandee is not None:
+                    query += "quantite_commandee = ?, "
+                    params.append(quantite_commandee)
+                if po_number is not None:
+                    query += "po_number = ?, "
+                    params.append(po_number)
+                if date_po is not None:
+                    query += "date_po = ?, "
+                    params.append(date_po)
+                if date_arrivee is not None:
+                    query += "date_arrivee = ?, "
+                    params.append(date_arrivee)
+                if est_approximatif is not None:
+                    query += "est_approximatif = ?, "
+                    params.append(est_approximatif)
+                query = query.rstrip(", ") + " WHERE id = ?"
+                params.append(id)
+                cursor.execute(query, params)
+                conn.commit()
+                logging.info(f"Produit {produit_nom} mis à jour dans l'inventaire (catégorie: {categorie})")
+        except Exception as e:
+            logging.error(f"Erreur lors de la mise à jour de l'inventaire : {e}")
+            raise
+
+    def delete_inventory(self, id):
+        """Supprime une entrée de la table inventaire."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM inventaire WHERE id = ?", (id,))
+                conn.commit()
+                logging.info(f"Entrée d'inventaire supprimée : ID {id}")
+        except Exception as e:
+            logging.error(f"Erreur lors de la suppression de l'entrée d'inventaire : {e}")
+            raise
+
+    def get_inventory(self, categorie=None):
+        """Récupère les stocks et projets à venir, éventuellement filtrés par catégorie."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT id, produit_nom, categorie, quantite_commandee, po_number, date_po, date_arrivee, est_approximatif
+                    FROM inventaire
+                """
+                params = []
+                if categorie:
+                    query += " WHERE categorie = ?"
+                    params.append(categorie)
+                query += " ORDER BY date_arrivee ASC"
+                cursor.execute(query, params)
+                return cursor.fetchall()
+        except Exception as e:
+            logging.error(f"Erreur lors de la récupération de l'inventaire : {e}")
+            return []
+
+    def deduct_inventory(self, produit_nom, categorie, quantite_utilisee, date_travaux):
+        """Déduit une quantité utilisée du stock actuel."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Insérer une entrée négative pour l'utilisation
+                cursor.execute("""
+                    INSERT INTO inventaire (produit_nom, categorie, quantite_commandee, po_number, date_po, date_arrivee, est_approximatif)
+                    VALUES (?, ?, ?, NULL, NULL, ?, 0)
+                """, (produit_nom, categorie, -quantite_utilisee, date_travaux))
+                # Supprimer les projets à venir correspondants (basés sur produit_nom, categorie, et date_arrivee proche)
+                cursor.execute("""
+                    DELETE FROM inventaire
+                    WHERE produit_nom = ? AND categorie = ? AND est_approximatif = 1
+                    AND date_arrivee BETWEEN ? AND ?
+                """, (produit_nom, categorie, (datetime.strptime(date_travaux, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d"), 
+                      (datetime.strptime(date_travaux, "%Y-%m-%d") + timedelta(days=7)).strftime("%Y-%m-%d")))
+                conn.commit()
+                logging.info(f"Déduit {quantite_utilisee} de {produit_nom} (catégorie: {categorie}) et supprimé projet à venir correspondant")
+        except Exception as e:
+            logging.error(f"Erreur lors de la déduction de l'inventaire : {e}")
+            raise
+
+    def get_work_sheets_for_inventory(self, categorie):
+        """Récupère les données de chantiers_reels pour l'inventaire."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                if categorie == "Produit de béton":
+                    query = """
+                        SELECT date_travaux, client_reel, produit_reel, sacs_utilises_reel, 0 as est_approximatif
+                        FROM chantiers_reels
+                        WHERE sacs_utilises_reel IS NOT NULL AND sacs_utilises_reel != ''
+                        ORDER BY date_travaux DESC
+                    """
+                else:  # Membrane
+                    query = """
+                        SELECT date_travaux, client_reel, type_membrane, nb_rouleaux_installes_reel, 0 as est_approximatif
+                        FROM chantiers_reels
+                        WHERE nb_rouleaux_installes_reel IS NOT NULL AND nb_rouleaux_installes_reel != ''
+                        ORDER BY date_travaux DESC
+                    """
+                cursor.execute(query)
+                return cursor.fetchall()
+        except Exception as e:
+            logging.error(f"Erreur lors de la récupération des feuilles de travail pour l'inventaire : {e}")
+            return []
 
     def create_tables(self):
         try:
@@ -164,7 +313,7 @@ class DatabaseManager:
                             continue
                         normalized_entry = {}
                         for old_key, new_key in key_mapping.items():
-                            normalized_entry[new_key] = entry.get(old_key, "")
+                            normalized_entry[new_key] = entry.get(old_key, entry.get(new_key, ""))
                         for key in entry:
                             if key not in key_mapping and key not in normalized_entry:
                                 normalized_entry[key] = entry[key]
@@ -192,9 +341,12 @@ class DatabaseManager:
     def sync_txt_to_db(self):
         """
         Synchronise les données de donnees_chantier.txt avec la table chantiers_reels.
-        Préserve les valeurs existantes de est_calcule et vide le fichier txt après synchronisation.
+        Préserve les valeurs existantes de est_calcule et évite les doublons.
         """
         try:
+            logging.debug(f"Base de données utilisée : {self.db_path}")
+            logging.debug(f"Fichier texte utilisé : {self.txt_path}")
+            
             data = self.read_txt_file()
             if not data:
                 logging.debug(f"Aucune donnée valide dans {self.txt_path}")
@@ -204,50 +356,48 @@ class DatabaseManager:
             for entry in data:
                 soumission_reel = entry.get("soumission_reel")
                 date_travaux = entry.get("date_travaux", "1900-01-01")
+                client_reel = entry.get("client_reel", "")
+                logging.debug(f"Entrée lue : soumission_reel={soumission_reel}, date_travaux={date_travaux}, client_reel={client_reel}")
                 if soumission_reel and date_travaux:
                     key = (soumission_reel, date_travaux)
                     try:
                         date_travaux_dt = datetime.strptime(date_travaux, "%Y-%m-%d")
                     except ValueError:
                         date_travaux_dt = datetime(1900, 1, 1)
+                    # Garder la dernière entrée en cas de doublons dans le fichier
                     if key not in unique_data or \
-                       date_travaux_dt > datetime.strptime(unique_data[key].get("date_travaux", "1900-01-01"), "%Y-%m-%d"):
+                    date_travaux_dt > datetime.strptime(unique_data[key].get("date_travaux", "1900-01-01"), "%Y-%m-%d"):
                         unique_data[key] = entry
                     else:
                         logging.debug(f"Doublon ignoré dans donnees_chantier.txt pour soumission_reel={soumission_reel}, date_travaux={date_travaux}")
 
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                # Récupérer les valeurs actuelles de est_calcule
+                # Récupérer les enregistrements existants
                 cursor.execute("SELECT soumission_reel, date_travaux, est_calcule FROM chantiers_reels")
-                est_calcule_map = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
+                existing_records = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
 
-                # Insérer ou mettre à jour les données
+                # Insérer uniquement les nouvelles entrées
+                inserted_keys = set()
                 for key, entry in unique_data.items():
                     soumission_reel, date_travaux = key
-                    # Utiliser la valeur existante de est_calcule ou 0 si nouvelle entrée
-                    est_calcule = est_calcule_map.get(key, 0)
-                    entry["est_calcule"] = est_calcule
-                    self.insert_work_sheet(entry, update_txt=False)
-
-                # Supprimer les enregistrements de la base qui ne sont plus dans unique_data
-                cursor.execute("SELECT soumission_reel, date_travaux FROM chantiers_reels")
-                existing_keys = {(row[0], row[1]) for row in cursor.fetchall()}
-                keys_to_delete = existing_keys - set(unique_data.keys())
-                for soumission_reel, date_travaux in keys_to_delete:
-                    cursor.execute(
-                        "DELETE FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
-                        (soumission_reel, date_travaux)
-                    )
-                    logging.debug(f"Supprimé soumission_reel={soumission_reel}, date_travaux={date_travaux} de chantiers_reels")
+                    if key not in existing_records:
+                        est_calcule = entry.get("est_calcule", 0)
+                        entry["est_calcule"] = est_calcule
+                        self.insert_work_sheet(entry, update_txt=False)
+                        inserted_keys.add(key)
+                        logging.debug(f"Nouvelle entrée insérée : soumission_reel={soumission_reel}, date_travaux={date_travaux}")
+                    else:
+                        logging.debug(f"Entrée existante ignorée : soumission_reel={soumission_reel}, date_travaux={date_travaux}")
 
                 conn.commit()
-                logging.debug(f"Table chantiers_reels synchronisée avec {len(unique_data)} entrées, est_calcule préservé")
+                logging.debug(f"Table chantiers_reels synchronisée avec {len(inserted_keys)} nouvelles entrées")
 
-            # Vider donnees_chantier.txt après synchronisation
+            # Mettre à jour donnees_chantier.txt en supprimant les entrées synchronisées
+            remaining_data = [entry for entry in data if (entry.get("soumission_reel"), entry.get("date_travaux", "1900-01-01")) not in inserted_keys]
             with open(self.txt_path, 'w', encoding='utf-8') as f:
-                json.dump([], f)
-            logging.debug(f"Fichier {self.txt_path} vidé après synchronisation")
+                json.dump(remaining_data, f, indent=2, ensure_ascii=False)
+            logging.debug(f"Fichier {self.txt_path} mis à jour avec {len(remaining_data)} entrées restantes")
 
         except Exception as e:
             logging.error(f"Erreur lors de la synchronisation de {self.txt_path} vers chantiers_reels : {e}")
@@ -256,7 +406,7 @@ class DatabaseManager:
     def insert_work_sheet(self, data, update_txt=True):
         """
         Insère une feuille de travail dans chantiers_reels et, optionnellement, met à jour donnees_chantier.txt.
-        Préserve la valeur existante de est_calcule.
+        Déduit automatiquement les quantités de l'inventaire.
         """
         columns = [
             "soumission_reel", "client_reel", "superficie_reel", "produit_reel", "produit_diff",
@@ -293,32 +443,47 @@ class DatabaseManager:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                # Vérifier si l'enregistrement existe déjà
                 soumission_reel = data.get("soumission_reel")
                 date_travaux = data.get("date_travaux")
+                # Vérifier si l'enregistrement existe déjà
                 cursor.execute(
-                    "SELECT est_calcule FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
+                    "SELECT id FROM chantiers_reels WHERE soumission_reel = ? AND date_travaux = ?",
                     (soumission_reel, date_travaux)
                 )
-                result = cursor.fetchone()
-                if result:
-                    est_calcule = result[0]
-                    logging.debug(f"Enregistrement existant trouvé pour soumission_reel={soumission_reel}, date_travaux={date_travaux}, est_calcule={est_calcule}")
+                exists = cursor.fetchone()
+                if exists:
+                    logging.debug(f"Enregistrement existant trouvé pour soumission_reel={soumission_reel}, date_travaux={date_travaux}, mise à jour effectuée")
+                    cursor.execute(
+                        "UPDATE chantiers_reels SET est_calcule = ? WHERE soumission_reel = ? AND date_travaux = ?",
+                        (data.get("est_calcule", 0), soumission_reel, date_travaux)
+                    )
                 else:
-                    est_calcule = data.get("est_calcule", 0)
-                    logging.debug(f"Nouvel enregistrement pour soumission_reel={soumission_reel}, date_travaux={date_travaux}, est_calcule={est_calcule}")
+                    values = [data.get(col, default_values[col]) for col in columns]
+                    query = f"""
+                        INSERT INTO chantiers_reels ({", ".join(columns)})
+                        VALUES ({", ".join(["?" for _ in columns])})
+                    """
+                    cursor.execute(query, values)
+                    logging.debug(f"Nouvelle feuille insérée dans chantiers_reels : {soumission_reel}, date_travaux={date_travaux}")
 
-                values = [data.get(col, default_values[col]) for col in columns[:-1]] + [est_calcule]
-                query = f"""
-                    INSERT OR REPLACE INTO chantiers_reels ({", ".join(columns)})
-                    VALUES ({", ".join(["?" for _ in columns])})
-                """
-                cursor.execute(query, values)
                 conn.commit()
-                logging.debug(f"Feuille insérée/mise à jour dans chantiers_reels : {soumission_reel}, date_travaux={date_travaux}")
+
+                # Déduire les quantités de l'inventaire
+                produit_nom = data.get("produit_reel")
+                type_membrane = data.get("type_membrane")
+                sacs_utilises = data.get("sacs_utilises_reel", "0")
+                rouleaux_utilises = data.get("nb_rouleaux_installes_reel", "0")
+                try:
+                    sacs = float(sacs_utilises) if sacs_utilises else 0.0
+                    rouleaux = float(rouleaux_utilises) if rouleaux_utilises else 0.0
+                    if sacs > 0 and produit_nom:
+                        self.deduct_inventory(produit_nom, "Produit de béton", sacs, date_travaux)
+                    if rouleaux > 0 and type_membrane:
+                        self.deduct_inventory(type_membrane, "Membrane", rouleaux, date_travaux)
+                except ValueError as e:
+                    logging.error(f"Erreur lors de la conversion des quantités pour {soumission_reel}: {e}")
 
             if update_txt:
-                # Mettre à jour donnees_chantier.txt
                 txt_data = self.read_txt_file()
                 txt_data = [entry for entry in txt_data if not (entry.get("soumission_reel") == soumission_reel and entry.get("date_travaux") == date_travaux)]
                 data_to_write = {k: v for k, v in data.items() if k != "est_calcule"}
@@ -329,7 +494,7 @@ class DatabaseManager:
 
         except Exception as e:
             logging.error(f"Erreur lors de l'insertion de {soumission_reel}, date_travaux={date_travaux} : {e}")
-            raise
+            
 
     def delete_work_sheet(self, soumission_reel, date_travaux):
         """
@@ -451,8 +616,6 @@ class DatabaseManager:
             logging.error(f"Erreur lors de la sauvegarde des coûts : {e}")
             raise
 
-
-    
     def get_produits(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -1108,7 +1271,6 @@ class DatabaseManager:
         """
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # Construire la liste des colonnes pour la requête
             columns_str = ", ".join(columns)
             query = f"""
                 SELECT {columns_str}
@@ -1119,15 +1281,11 @@ class DatabaseManager:
                 cursor.execute(query, (submission_number,))
                 result = cursor.fetchone()
                 if result:
-                    # Retourner un dictionnaire avec les colonnes comme clés
                     return dict(zip(columns, result))
                 return {}
             except sqlite3.Error as e:
                 print(f"[ERREUR] Impossible de récupérer les détails de la soumission {submission_number} : {e}")
                 return {}
-            
-
-
 
     def check_cost_exists(self, submission_number, date_travaux):
         """Vérifie si une entrée existe dans la table costs pour submission_number et date_travaux."""
@@ -1328,4 +1486,3 @@ class DatabaseManager:
                 return cursor.fetchall()
         except Exception:
             return []
-

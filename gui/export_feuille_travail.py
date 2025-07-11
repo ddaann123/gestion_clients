@@ -168,8 +168,8 @@ class ExportFeuilleTravailWindow:
         )
 
         employes = [
-            "KASSIM GOSSELIN", "ALEX VALOIS", "KARL", "ANTHONY ALLAIRE",
-            "MARC POTHIER", "NATHAN", "ANTHONY LABBÉ", "JONATHAN GRENIER"
+            "KASSIM GOSSELIN", "ALEX VALOIS", "KARL MORIN", "ANTHONY ALLAIRE",
+            "MARC POTHIER", "NATHAN CHARPENTIER", "ANTHONY LABBÉ", "JONATHAN FORTIER"
         ]
 
         rows_html = ""
@@ -284,9 +284,9 @@ class ExportFeuilleTravailWindow:
                         <label>Produit utilisé si différent</label>
                         <select name="produit_diff">
                             <option value="">--</option>
-                            <option value="Maxcrete complete">Maxcrete complete</option>
-                            <option value="Surface Gyp">Surface Gyp</option>
-                            <option value="Autre">Autre</option>
+                            <option value="MAXCRETE COMPLETE (2500-3500 PSI)">Maxcrete complete</option>
+                            <option value="SURFACE GYP (2500-3500 PSI)">Surface Gyp</option>
+                            <option value="AUTRE">Autre</option>
                         </select>
                     </div>
                 </div>
@@ -437,8 +437,8 @@ class ExportFeuilleTravailWindow:
             )
 
             employes = [
-                "KASSIM GOSSELIN", "ALEX VALOIS", "KARL", "ANTHONY ALLAIRE",
-                "MARC POTHIER", "NATHAN", "ANTHONY LABBÉ", "JONATHAN GRENIER"
+                "KASSIM GOSSELIN", "ALEX VALOIS", "KARL MORIN", "ANTHONY ALLAIRE",
+                "MARC POTHIER", "NATHAN CHARPENTIER", "ANTHONY LABBÉ", "JONATHAN FORTIER"
             ]
 
             rows_html = ""
@@ -560,9 +560,9 @@ class ExportFeuilleTravailWindow:
                         <label>Produit utilisé si différent</label>
                         <select name="produit_diff">
                             <option value="">--</option>
-                            <option value="Maxcrete complete">Maxcrete complete</option>
-                            <option value="Surface Gyp">Surface Gyp</option>
-                            <option value="Autre">Autre</option>
+                            <option value="MAXCRETE COMPLETE (2500-3500 PSI)">Maxcrete complete</option>
+                            <option value="SURFACE GYP (2500-3500 PSI)">Surface Gyp</option>
+                            <option value="AUTRE">Autre</option>
                         </select>
                     </div>
                 </div>

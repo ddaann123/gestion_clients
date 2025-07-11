@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
+from functools import wraps
 import os
 import json
 import smtplib
@@ -6,15 +7,62 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import logging
+import sys
 
-# Configurer le logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configurer le logging avec deux gestionnaires : fichier et console
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+# Gestionnaire pour le fichier
+try:
+    file_handler = logging.FileHandler(r'C:\Users\danle\flask_log.txt', mode='a', encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+except PermissionError as e:
+    print(f"Erreur de permission lors de la configuration du logging (fichier) : {e}")
+    sys.exit(1)
+
+# Gestionnaire pour la console
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)
+console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(console_formatter)
+logger.addHandler(console_handler)
+
+# Capturer les exceptions non gérées
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    logging.error("Exception non gérée", exc_info=(exc_type, exc_value, exc_traceback))
+sys.excepthook = handle_exception
 
 app = Flask(__name__, static_folder="static")
 
 # Chemins absolus
-TXT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "donnees_chantier.txt"))
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "database", "clients.db"))
+TXT_PATH = r"C:\gestion_clients\donnees_chantier.txt"
+DB_PATH = r"C:\gestion_clients\database\clients.db"
+
+
+def check_auth(username, password):
+    return username == "plancher" and password == "plancher3390"  # Remplacez par vos identifiants
+
+def authenticate():
+    return Response(
+        "Veuillez entrer vos identifiants.", 401,
+        {"WWW-Authenticate": 'Basic realm="Login Required"'}
+    )
+
+def requires_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not check_auth(auth.username, auth.password):
+            return authenticate()
+        return f(*args, **kwargs)
+    return decorated
 
 def get_employe_nom(i):
     employes = {
@@ -117,6 +165,7 @@ def calculate_work_hours(start_time, end_time):
         return "N/A"
 
 @app.route("/")
+@requires_auth
 def formulaire():
     try:
         with open("static/formulaires.json", "r", encoding="utf-8") as f:
@@ -238,4 +287,9 @@ def submit():
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    logging.info("Démarrage du serveur Flask")
+    try:
+        app.run(debug=False, host="0.0.0.0", port=5000)
+    except Exception as e:
+        logging.error(f"Échec du démarrage du serveur Flask : {e}")
+        raise
